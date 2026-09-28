@@ -18,6 +18,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import mlflow
+import numpy as np
 import pandas as pd
 from transformers import AutoTokenizer
 
@@ -73,9 +74,19 @@ def train_model(
     overrides: dict | None = None,
     tags: dict[str, str] | None = None,
     register: bool = True,
+    extra_dataset_version: str | None = None,
+    reference_texts: list[str] | None = None,
+    corrupt_labels: float = 0.0,
 ) -> TrainResult:
-    """Train one model end-to-end. `extra_train` adds rows (e.g. labelled drift data) to the
-    train split of a task; `extra_eval` = {prefix: test_sets} for additional evaluations."""
+    """Train one model end-to-end.
+
+    extra_train          rows added to each task's train split (e.g. labelled drift data)
+    extra_eval           {prefix: test_sets} evaluated in addition to the standard test sets
+    extra_dataset_version content hash of the extra data, folded into `dataset_version`
+    reference_texts      saved with the model as its drift reference (reference_texts.json)
+    corrupt_labels       FAULT INJECTION for the safety-gate demo: fraction of training labels
+                         replaced with random wrong labels (simulates a broken annotation batch)
+    """
     cfg = get_config()
     seed = set_seed()
     overrides = overrides or {}
@@ -92,6 +103,8 @@ def train_model(
         for name, df in (("train", tr), ("val", va)):
             validate_labeled_frame(df, f"{task}/{name}", N_CLASSES[task],
                                    min_rows=10).raise_if_failed()
+        if corrupt_labels > 0:
+            tr = _corrupt(tr, corrupt_labels, N_CLASSES[task], seed)
         train_data[task], val_data[task] = tr, va
 
     device = pick_device()
@@ -100,6 +113,8 @@ def train_model(
     with mlflow.start_run(run_name=run_name) as run:
         run_id = run.info.run_id
         lineage = lineage_tags()
+        if extra_dataset_version:
+            lineage["dataset_version"] = f"{lineage['dataset_version']}+{extra_dataset_version}"
         mlflow.set_tags({**lineage, "model_family": "multitask-distilbert", **(tags or {})})
         mlflow.log_params({
             **{k: v for k, v in asdict(tcfg).items()},
@@ -107,6 +122,7 @@ def train_model(
             "max_train_per_task": max_per_task, "dropout": cfg["model"]["dropout"],
             **{f"n_train_{t}": len(df) for t, df in train_data.items()},
             "extra_train_rows": sum(len(v) for v in (extra_train or {}).values()),
+            "corrupt_labels": corrupt_labels,
         })
         log.info("Training on %s: %s", device,
                  {t: len(df) for t, df in train_data.items()})
@@ -124,6 +140,9 @@ def train_model(
             "pooling": cfg["model"]["embedding_pooling"], "run_id": run_id,
             "dataset_version": lineage["dataset_version"], "git_commit": lineage["git_commit"],
         })
+        if reference_texts:
+            (out_dir / "reference_texts.json").write_text(
+                json.dumps(reference_texts, ensure_ascii=False), encoding="utf-8")
         del model
         # evaluate from the SAVED artifact, which also proves the artifact loads (gate 4)
         test = evaluate_model_dir(out_dir, default_test_sets())
@@ -152,6 +171,16 @@ def train_model(
              run_id, test["sentiment_macro_f1"], test["toxicity_f1"], test["toxicity_recall"],
              version)
     return TrainResult(run_id, version, str(out_dir), test, extra)
+
+
+def _corrupt(df: pd.DataFrame, rate: float, n_classes: int, seed: int) -> pd.DataFrame:
+    """Replace `rate` of labels with a different random class (seeded)."""
+    rng = np.random.default_rng(seed + 1)
+    df = df.copy()
+    idx = rng.choice(len(df), int(len(df) * rate), replace=False)
+    shift = rng.integers(1, n_classes, size=len(idx))
+    df.loc[df.index[idx], "label"] = (df["label"].to_numpy()[idx] + shift) % n_classes
+    return df
 
 
 def cleanup_run_artifacts(run_id: str) -> None:

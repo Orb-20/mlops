@@ -153,20 +153,25 @@ def run_promotion(candidate_version: str, extra_test_sets: dict | None = None,
     artifact = check_artifact(cand_dir)
     engine = PromotionDecisionEngine()
     prod = registry.get_version_by_alias("production")
-    prod_version = prod.version if prod else None
+    prod_version = str(prod.version) if prod else None
 
     cand_metrics, cand_reg = {}, {"passed": False, "failed": -1, "max_failed_cases": 0,
                                   "failed_ids": [], "critical_failed_ids": []}
     prod_metrics = prod_reg = None
+    extra: dict[str, dict] = {}  # informational: e.g. held-out drift test set
     if artifact.passed:
         cp = Predictor(cand_dir, version=candidate_version)
         cand_metrics = evaluate_predictor(cp, test_sets)
         cand_reg = run_suite(cp).to_dict()
+        for prefix, sets in (extra_test_sets or {}).items():
+            extra.setdefault(prefix, {})["candidate"] = evaluate_predictor(cp, sets)
         del cp
-        if prod is not None and prod.version != candidate_version:
+        if prod is not None and str(prod.version) != str(candidate_version):
             pp = Predictor(registry.download_model(prod.version), version=prod.version)
             prod_metrics = evaluate_predictor(pp, test_sets)
             prod_reg = run_suite(pp).to_dict()
+            for prefix, sets in (extra_test_sets or {}).items():
+                extra.setdefault(prefix, {})["production"] = evaluate_predictor(pp, sets)
             del pp
     decision = engine.decide(candidate_version, cand_metrics, cand_reg, artifact,
                              prod_version, prod_metrics, prod_reg)
@@ -186,6 +191,7 @@ def run_promotion(candidate_version: str, extra_test_sets: dict | None = None,
         "candidate_regression": {k: v for k, v in cand_reg.items() if k != "cases"},
         "production_regression": ({k: v for k, v in prod_reg.items() if k != "cases"}
                                   if prod_reg else None),
+        "extra_evaluations": extra,
     }
     return decision
 

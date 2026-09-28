@@ -43,6 +43,17 @@ def window_from_texts(predictor, texts: list[str]) -> WindowData:
                       [p.toxicity_label for p in out.predictions], list(texts))
 
 
+def texts_for_model(predictor) -> list[str]:
+    """A model may ship its own reference (after drift-triggered retraining the reference is
+    reset to historical + recent data). Otherwise use the default validation sample."""
+    path = Path(getattr(predictor, "model_dir", "")) / "reference_texts.json"
+    if path.is_file():
+        import json
+
+        return json.loads(path.read_text(encoding="utf-8"))
+    return reference_texts()
+
+
 def _path(version: str) -> Path:
     return project_path("artifacts", "reference", f"v{version}.npz")
 
@@ -65,6 +76,6 @@ def get_reference(predictor, version: str, rebuild: bool = False) -> WindowData:
     if path.exists() and not rebuild:
         return load_window_file(path)
     log.info("Building reference window for model v%s", version)
-    w = window_from_texts(predictor, reference_texts())
+    w = window_from_texts(predictor, texts_for_model(predictor))
     save_window(w, path)
     return w

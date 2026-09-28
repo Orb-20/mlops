@@ -102,3 +102,36 @@ stages:
       hash: md5
       md5: 476df624594012a119295beae0421790
       size: 837
+  drift_data:
+    cmd: python scripts/simulate_drift.py --build-only
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: b15516df658c248a2608e4b0ab698744.dir
+      size: 5960873
+      nfiles: 7
+    - path: scripts/simulate_drift.py
+      hash: md5
+      md5: 8b9f9f15a71e4a5592a8b01609d0e720
+      size: 6386
+    outs:
+    - path: data/drift
+      hash: md5
+      md5: 7838bd072e7b2a597db150dd339fc0ca.dir
+      size: 34552
+      nfiles: 4
+  validate_curated:
+    cmd: python -m src.evaluation.regression --validate
+    deps:
+    - path: data/regression/regression_cases.csv
+      hash: md5
+      md5: d6d89e921df28929232eeac66b75f92f
+      size: 5178
+    - path: data/sample/youtube_comments.csv
+      hash: md5
+      md5: 8b6fddfe6f0c165141465bde2e66ca60
+      size: 23610
+    - path: src/evaluation/regression.py
+      hash: md5
+      md5: db16c8f12aeea88e03af9d47551a9835
+      size: 4749
