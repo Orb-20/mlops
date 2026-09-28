@@ -1,0 +1,14 @@
+# Demonstration gate thresholds (spec §37). Configurable, not universal standards.
+gates:
+  minimum_metrics:
+    sentiment_macro_f1_min: 0.60
+    toxicity_f1_min: 0.65
+    toxicity_recall_min: 0.60
+  regression:
+    max_failed_cases: 12
+  production_comparison:
+    # candidate may not be worse than production by more than these absolute margins
+    max_sentiment_macro_f1_drop: 0.02
+    max_toxicity_f1_drop: 0.02
+    max_toxicity_recall_drop: 0.03
+    max_additional_regression_failures: 1

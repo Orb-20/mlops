@@ -1,0 +1,26 @@
+model:
+  pretrained_name: distilbert-base-uncased
+  max_length: 128
+  dropout: 0.1
+  embedding_pooling: mean
+
+training:
+  epochs: 2
+  batch_size: 16
+  eval_batch_size: 64
+  learning_rate: 3.0e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.06
+  toxicity_loss_weight: 1.0   # lambda in L = L_sent + lambda * L_tox
+  fp16: true                  # only used when CUDA is available
+  # Caps for quick runs on a 4 GB laptop GPU; set to null to use the full processed split
+  max_train_per_task: 8000
+
+inference:
+  batch_size: 32
+  toxicity_threshold: 0.5
+
+baseline:
+  tfidf_max_features: 50000
+  ngram_range: [1, 2]
+  C: 4.0

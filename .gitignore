@@ -1,0 +1,43 @@
+# Secrets
+.env
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ML artifacts (tracked by MLflow / DVC, not git)
+mlruns/*
+!mlruns/.gitkeep
+mlartifacts/
+mlflow.db
+artifacts/
+models/
+
+# Data (tracked by DVC; small curated sets are committed)
+/data/raw/*
+/data/interim/*
+/data/processed/*
+/data/reference/*
+/data/drift/*
+!/data/**/.gitkeep
+local.db
+
+# Reports generated at runtime
+reports/generated/*
+reports/drift/*
+reports/evaluation/*
+!reports/**/.gitkeep
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

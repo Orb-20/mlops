@@ -1,0 +1,53 @@
+project:
+  name: adaptive-nlp-mlops
+  seed: 42
+
+paths:
+  raw: data/raw
+  interim: data/interim
+  processed: data/processed
+  reference: data/reference
+  regression: data/regression
+  drift: data/drift
+  sample: data/sample
+  artifacts: artifacts
+  reports: reports
+
+data:
+  sentiment:
+    hf_dataset: cardiffnlp/tweet_eval
+    hf_config: sentiment
+    # tweet_eval label ids: 0=negative 1=neutral 2=positive (native 3-class, no mapping invented)
+    labels: [negative, neutral, positive]
+    max_train: 12000
+    max_val: 2000
+    max_test: 3000
+  toxicity:
+    hf_dataset: thesofakillers/jigsaw-toxic-comment-classification-challenge
+    hf_file: train.csv
+    raw_label_columns: [toxic, severe_toxic, obscene, threat, insult, identity_hate]
+    # toxic = 1 if ANY raw label is 1 (documented in docs/data-pipeline.md)
+    labels: [safe, toxic]
+    max_total: 20000
+    split: {train: 0.7, val: 0.1, test: 0.2}
+  text:
+    min_chars: 2
+    max_chars: 2000
+
+ingestion:
+  default_max_comments: 300
+  youtube:
+    api_base: https://www.googleapis.com/youtube/v3
+    page_size: 100
+    max_retries: 3
+    backoff_seconds: 1.0
+    timeout_seconds: 15
+
+monitoring:
+  poll_interval_seconds: 300
+  window_size: 200
+
+mlflow:
+  training_experiment: sentiment-toxicity-training
+  retraining_experiment: drift-retraining
+  registered_model: sentiment-toxicity-model

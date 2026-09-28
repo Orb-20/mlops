@@ -1,0 +1,33 @@
+# Demonstration thresholds. These are NOT universal constants; see docs/drift-detection.md
+# for how they were calibrated (stable-vs-stable null runs on held-out reference data).
+drift:
+  minimum_samples: 100
+  reference_size: 500
+  warning_ratio: 0.7          # score >= warning_ratio * threshold -> "warning"
+  overall_threshold: 0.5      # weighted vote of per-signal drift flags
+
+  embedding:
+    enabled: true
+    method: mmd_rbf
+    threshold: 0.10           # permutation-test p-value must also be < p_value
+    p_value: 0.05
+    permutations: 200
+    max_samples: 500
+    weight: 0.70
+
+  language:
+    enabled: true
+    method: total_variation   # 0.5 * sum |p_ref - p_cur|
+    threshold: 0.10
+    weight: 0.15
+
+  prediction:
+    enabled: true
+    method: total_variation   # max over sentiment / toxicity label distributions
+    threshold: 0.10
+    weight: 0.15
+
+  vocabulary:
+    enabled: true             # reported, not voted (supporting evidence only)
+    top_k: 25
+    min_count: 3
