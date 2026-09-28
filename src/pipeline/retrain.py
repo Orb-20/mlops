@@ -197,7 +197,7 @@ def run_retraining(
             extra_train=as_task_frames(train),
             extra_eval={"drift_test": as_task_frames(test)},
             tags={
-                "trigger": "drift",
+                "trigger": "drift" if ev_id is not None else "manual",
                 "drift_event_id": str(ev_id),
                 "scenario": scenario,
                 "dvc_status": dvc_status[:250],

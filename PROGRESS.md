@@ -18,15 +18,17 @@ Legend: ✅ done & verified · 🟡 done, partially verified · ⛔ blocked / un
 | 6 | YouTube ingestion | 🟡 | demo verified; live path mock-tested only (no API key) |
 | 7 | FastAPI | ✅ | all endpoints curl-verified + 9 API tests |
 | 8 | Database | 🟡 | SQLite verified; PostgreSQL only via compose (unverified) |
-| 9 | Drift monitoring | ⏳ | engine + calibration done; simulation next |
-| 10 | Drift simulation | ⬜ | |
-| 11 | Automated retraining | ⬜ | |
-| 12 | Regression gate | 🟡 | 48-case suite + engine done; fail path demo pending |
-| 13 | GitHub Actions | ⬜ | |
-| 14 | Streamlit dashboard | ⬜ | |
-| 15 | Reporting | ⬜ | |
-| 16 | Docker Compose | ⬜ | Docker not installed on this machine |
-| 17 | End-to-end demo | ⬜ | |
+| 9 | Drift monitoring | ✅ | MMD² + TV + vocabulary + Evidently; calibrated thresholds |
+| 10 | Drift simulation | ✅ | stable → STABLE (0.000), shifted → DRIFT (0.117) |
+| 11 | Automated retraining | ✅ | drift event → candidate → gates → decision recorded |
+| 12 | Regression gate | ✅ | PASS path (v3 promoted) and FAIL path (v2, v4 rejected) both demonstrated |
+| 13 | GitHub Actions | ⛔ | ci.yml + model-validation.yml written, YAML validated, CI steps run locally; never run on GitHub (no remote) |
+| 14 | Streamlit dashboard | ✅ | 3 pages, Playwright-verified, 0 exceptions |
+| 15 | Reporting | ✅ | HTML (inline SVG) + Markdown from stored data |
+| 16 | Docker Compose | ⛔ | Dockerfile + compose written & YAML-validated; **never built** (no Docker here) |
+| 17 | End-to-end demo | 🟡 | full lifecycle verified locally (non-Docker); compose path unverified |
+
+**Current state (2026-09-29):** production model **v3**; 111 tests passing; ruff + black clean.
 
 ## Known blockers / unverified items
 
@@ -141,3 +143,67 @@ curl of every endpoint (422 invalid URL, 400 live-without-key, 404 report); 15 n
 **Not verified**: live YouTube fetch (no key); PostgreSQL (no Docker).
 
 **Next**: Phase 9/10 — `scripts/simulate_drift.py` (stable vs shifted, drift report, trigger retraining).
+
+### 2026-09-29 — Phases 9-11: Drift simulation & retraining ✅
+**Done**
+- `src/monitoring/simulation.py`: deterministic controlled drift set (47 slang/meme/Hinglish templates,
+  labels by construction, template-level train/test split): train 1200 / test 400 / window 300,
+  DVC stage `drift_data` (hash 5ba1ffa2db9c, rebuild-identical).
+- `scripts/simulate_drift.py`: stable vs shifted windows → drift events → reports/drift/*.{json,md,html}.
+- `src/pipeline/retrain.py`: quality checks (clean, dedupe, overlap removal vs all eval sets, balance),
+  `dvc commit drift_data`, candidate training (experiment `drift-retraining`), promotion, model_events,
+  drift-event status. Reference reset (50% historical + 50% recent) shipped with the model.
+- Fault injection `--scenario corrupted_labels` (60% labels corrupted) for the safety-gate demo.
+- Evidently 0.7.23 `DataDriftPreset` (API inspected before use) as supplementary evidence.
+
+**Recorded outcomes**
+| step | result |
+|---|---|
+| stable window (v1) | STABLE, MMD² 0.000, p 0.91 |
+| shifted window (v1) | DRIFT (high): MMD² 0.117 p 0.005, language TV 0.25, prediction TV 0.15 → event #6 |
+| retrain attempt 1 → v2 | **REJECT** production_comparison_failed (tox recall 0.771 vs 0.808) |
+| fix | per-model toxicity threshold calibrated on validation split (gates unchanged) |
+| retrain attempt 2 → v3 | **PROMOTE** (thr 0.18; F1 0.798, recall 0.825; regression 12 vs 13) |
+| monitor again (v3) | shifted window MMD² 0.117 → 0.037 → no drift (adapted) |
+| corrupted labels → v4 | **REJECT** min metrics + regression (40/48, 4 critical) + comparison; production stays v3 |
+- Honest note: v3 has identical weights to v2 (seeded, deterministic); promotion came from the threshold.
+
+**Bugs found & fixed**: stale `candidate` alias (MLflow int vs str versions) + regression test;
+simulate_drift exit code after adaptation; v4 `trigger` tag said "drift" for a manual run (code fixed,
+tag corrected to `manual` to match its model event with no drift event).
+
+### 2026-09-29 — Phases 13-17: CI, dashboard, reporting, Docker, docs
+- Dashboard (`dashboard/app.py` + `views/`): Analyze Video, MLOps Monitoring, Model Registry. Colours
+  chosen by job and checked with the dataviz palette validator; light theme pinned because the
+  sentiment red/gray pair fails CVD separation on dark surfaces; direct % labels on all bars.
+  Verified with Playwright screenshots (0 exceptions; report download buttons present).
+- Reports: HTML + Markdown with OBSERVED DATA / MODEL PREDICTION / DRIFT SIGNAL sections.
+- CI: `.github/workflows/ci.yml`, `model-validation.yml`; every CI step reproduced locally
+  (pip check, ruff, black --check, suite validation, demo-data byte-identity, all tests).
+- Docker: `Dockerfile`, `docker-compose.yml` (postgres, mlflow, api, dashboard, bootstrap profile),
+  `docker/postgres-init.sql`, `.dockerignore`, `scripts/setup_local.py`. **Not built.**
+- Docs: README (20 sections), docs/{architecture (Mermaid), data-pipeline, model, mlops-lifecycle,
+  drift-detection, retraining, deployment, testing, demo-script, limitations}.md, LICENSE.
+- Issue found: file edits via a Python script on Windows wrote cp1252 + CRLF×2 into one dashboard file;
+  repaired and verified all repo text files are UTF-8.
+
+## Quality gate (spec §57)
+
+| Area | Item | Status |
+|---|---|---|
+| Repository | structure, README, .env.example, .gitignore, configuration | ✅ |
+| Data | datasets documented, preprocessing, DVC, demo data | ✅ |
+| ML | baseline, transformer, sentiment + toxicity metrics, embeddings | ✅ |
+| MLOps | MLflow tracking + registry, DVC, drift detection, retraining, regression gate, promote/reject | ✅ |
+| Backend | FastAPI, health, analysis, monitoring endpoints | ✅ |
+| Database | schema + persistence on SQLite | ✅ · PostgreSQL ⛔ unverified |
+| UI | URL input, analysis dashboard, MLOps dashboard, drift charts, model history, report | ✅ |
+| DevOps | Docker / Compose ⛔ unverified · GitHub Actions ⛔ not yet run |
+| Tests | unit, API, integration, regression ✅ (111) · end-to-end demo ✅ locally |
+| External | live YouTube API ⛔ unverified (no key) |
+
+## What remains / next steps (need the user or other infrastructure)
+1. Install Docker Desktop, run `docker compose up --build` + bootstrap profile; fix whatever breaks.
+2. Add a `YOUTUBE_API_KEY` to `.env` and run one live analysis (`python -m src.pipeline.analyze --url ...`).
+3. Push to GitHub to get the first real CI run.
+4. Optional: multilingual encoder for Hinglish; larger / human-labelled drift data.
