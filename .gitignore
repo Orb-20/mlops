@@ -22,11 +22,8 @@ artifacts/
 models/
 
 # Data (tracked by DVC; small curated sets are committed)
-/data/raw/*
 /data/interim/*
-/data/processed/*
 /data/reference/*
-/data/drift/*
 !/data/**/.gitkeep
 local.db
 

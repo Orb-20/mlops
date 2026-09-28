@@ -1,0 +1,54 @@
+stages:
+  download:
+    cmd: python -m src.data.prepare --step download
+    params:
+      - configs/config.yaml:
+          - data.sentiment.hf_dataset
+          - data.sentiment.hf_config
+          - data.toxicity.hf_dataset
+          - data.toxicity.hf_file
+    outs:
+      - data/raw
+
+  prepare:
+    cmd: python -m src.data.prepare --step build
+    deps:
+      - data/raw
+      - src/data/prepare.py
+      - src/data/preprocessing.py
+      - src/data/validation.py
+    params:
+      - configs/config.yaml:
+          - project.seed
+          - data
+    outs:
+      - data/processed
+
+  baseline:
+    cmd: python -m src.training.baseline
+    deps:
+      - data/processed
+      - src/training/baseline.py
+    params:
+      - configs/model.yaml:
+          - baseline
+    metrics:
+      - reports/evaluation/baseline_metrics.json:
+          cache: false
+
+  drift_data:
+    cmd: python scripts/simulate_drift.py --build-only
+    deps:
+      - data/processed
+      - scripts/simulate_drift.py
+    outs:
+      - data/drift
+
+  # Small curated sets are git-tracked (so CI can use them without a DVC remote);
+  # listing them as deps records their content hash in dvc.lock.
+  validate_curated:
+    cmd: python -m src.evaluation.regression --validate
+    deps:
+      - data/regression/regression_cases.csv
+      - data/sample/youtube_comments.csv
+      - src/evaluation/regression.py

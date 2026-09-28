@@ -141,8 +141,13 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(name)s: %(message)s")
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--offline", action="store_true")
+    ap.add_argument("--step", choices=["download", "build", "all"], default="all",
+                    help="download: fetch raw only; build: raw -> processed (offline)")
     args = ap.parse_args()
-    prepare(offline=args.offline)
+    if args.step == "download":
+        download_raw()
+    else:
+        prepare(offline=args.offline or args.step == "build")
 
 
 if __name__ == "__main__":

@@ -11,8 +11,8 @@ Legend: ✅ done & verified · 🟡 done, partially verified · ⛔ blocked / un
 |---|---|---|---|
 | 0 | Repository inspection | ✅ | See implementation plan |
 | 1 | Project skeleton | ✅ | 61 tests pass |
-| 2 | Data pipeline | ⏳ | code written, not yet run |
-| 3 | Baseline (TF-IDF + LR) | ⬜ | |
+| 2 | Data pipeline | ✅ | DVC repro deterministic, hash 1cbb27cc862a |
+| 3 | Baseline (TF-IDF + LR) | ⏳ | |
 | 4 | Transformer model | ⬜ | |
 | 5 | MLflow registry | ⬜ | |
 | 6 | YouTube ingestion | ⬜ | |
@@ -72,3 +72,18 @@ mocked HTTP incl. pagination/quota/disabled/404/retry/malformed). `ruff check` c
 because tweet_eval 3-class macro-F1 is ~0.70 even for strong models; to be calibrated in Phase 12.
 
 **Next**: Phase 2 — run `python -m src.data.prepare` (download tweet_eval + Jigsaw), DVC init and tracking.
+
+### 2026-09-29 — Phase 2: Data pipeline ✅
+**Done**
+- Downloaded tweet_eval sentiment (3-class) + Jigsaw train.csv from Hugging Face.
+- `src/data/prepare.py` (`--step download|build|all`): clean → dedupe → split (leakage-checked) → validate → parquet + manifest.
+- `dvc init`; `dvc.yaml` stages: download, prepare, baseline, drift_data, validate_curated.
+- Processed: sentiment 12000/2000/3000, toxicity 14000/2000/4000 (10.2% toxic, stratified).
+- `docs/data-pipeline.md` written (sources, label mapping, versioning).
+
+**Verified**: `dvc repro download prepare` ran; `dvc repro -f prepare` reproduced identical
+`dataset_version=1cbb27cc862a`. New unit test for Jigsaw any-label mapping + stratified deterministic split passes.
+
+**Commands**: `python -m src.data.prepare`, `dvc init`, `dvc repro download prepare`, `dvc repro -f prepare`, `dvc status`.
+
+**Next**: Phase 3 — run TF-IDF + LogisticRegression baseline, log to MLflow, record metrics.

@@ -1,0 +1,79 @@
+schema: '2.0'
+stages:
+  download:
+    cmd: python -m src.data.prepare --step download
+    params:
+      configs/config.yaml:
+        data.sentiment.hf_config: sentiment
+        data.sentiment.hf_dataset: cardiffnlp/tweet_eval
+        data.toxicity.hf_dataset: 
+          thesofakillers/jigsaw-toxic-comment-classification-challenge
+        data.toxicity.hf_file: train.csv
+    outs:
+    - path: data/raw
+      hash: md5
+      md5: 5ecf88f31c4d5b2d752be75ef2e63d4e.dir
+      size: 73652330
+      nfiles: 4
+  prepare:
+    cmd: python -m src.data.prepare --step build
+    deps:
+    - path: data/raw
+      hash: md5
+      md5: 5ecf88f31c4d5b2d752be75ef2e63d4e.dir
+      size: 73652330
+      nfiles: 4
+    - path: src/data/prepare.py
+      hash: md5
+      md5: 9097988df3e8a0c9a8806010c5d45ff3
+      size: 6091
+    - path: src/data/preprocessing.py
+      hash: md5
+      md5: 8f322d10f0c0559d6e3bc6d73cf38cde
+      size: 1595
+    - path: src/data/validation.py
+      hash: md5
+      md5: 383c088cd801410aebcf042fae4bca8f
+      size: 2625
+    params:
+      configs/config.yaml:
+        data:
+          sentiment:
+            hf_dataset: cardiffnlp/tweet_eval
+            hf_config: sentiment
+            labels:
+            - negative
+            - neutral
+            - positive
+            max_train: 12000
+            max_val: 2000
+            max_test: 3000
+          toxicity:
+            hf_dataset: 
+              thesofakillers/jigsaw-toxic-comment-classification-challenge
+            hf_file: train.csv
+            raw_label_columns:
+            - toxic
+            - severe_toxic
+            - obscene
+            - threat
+            - insult
+            - identity_hate
+            labels:
+            - safe
+            - toxic
+            max_total: 20000
+            split:
+              train: 0.7
+              val: 0.1
+              test: 0.2
+          text:
+            min_chars: 2
+            max_chars: 2000
+        project.seed: 42
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: b15516df658c248a2608e4b0ab698744.dir
+      size: 5960873
+      nfiles: 7
