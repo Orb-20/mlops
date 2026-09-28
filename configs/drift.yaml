@@ -1,15 +1,19 @@
-# Demonstration thresholds. These are NOT universal constants; see docs/drift-detection.md
-# for how they were calibrated (stable-vs-stable null runs on held-out reference data).
+# Demonstration thresholds. These are NOT universal constants; see docs/drift-detection.md.
+# Calibration (2026-09-29, model v1, reference = 500 val texts, 200 permutations):
+#   held-out same-distribution windows : MMD^2 ~ 0.000 (p 0.46-0.94)
+#   synthetic demo YouTube comments    : MMD^2 = 0.063 (p 0.005)  -> domain difference
+#   controlled slang/Hinglish window   : MMD^2 = 0.117 (p 0.005)  -> intended drift
+# Threshold 0.09 sits between; warning band starts at 0.6 * 0.09 = 0.054.
 drift:
   minimum_samples: 100
   reference_size: 500
-  warning_ratio: 0.7          # score >= warning_ratio * threshold -> "warning"
+  warning_ratio: 0.6          # score >= warning_ratio * threshold -> "warning"
   overall_threshold: 0.5      # weighted vote of per-signal drift flags
 
   embedding:
     enabled: true
     method: mmd_rbf
-    threshold: 0.10           # permutation-test p-value must also be < p_value
+    threshold: 0.09           # MMD^2 effect size; permutation p-value must also be < p_value
     p_value: 0.05
     permutations: 200
     max_samples: 500

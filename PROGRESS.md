@@ -15,10 +15,10 @@ Legend: ✅ done & verified · 🟡 done, partially verified · ⛔ blocked / un
 | 3 | Baseline (TF-IDF + LR) | ✅ | sent macro-F1 0.519, tox F1 0.722 |
 | 4 | Transformer model | ✅ | v1: sent macro-F1 0.675, tox F1 0.792 |
 | 5 | MLflow registry | ✅ | v1 = production via gates |
-| 6 | YouTube ingestion | ⬜ | |
-| 7 | FastAPI | ⬜ | |
-| 8 | Database | ⬜ | |
-| 9 | Drift monitoring | ⬜ | |
+| 6 | YouTube ingestion | 🟡 | demo verified; live path mock-tested only (no API key) |
+| 7 | FastAPI | ✅ | all endpoints curl-verified + 9 API tests |
+| 8 | Database | 🟡 | SQLite verified; PostgreSQL only via compose (unverified) |
+| 9 | Drift monitoring | ⏳ | engine + calibration done; simulation next |
 | 10 | Drift simulation | ⬜ | |
 | 11 | Automated retraining | ⬜ | |
 | 12 | Regression gate | 🟡 | 48-case suite + engine done; fail path demo pending |
@@ -33,6 +33,8 @@ Legend: ✅ done & verified · 🟡 done, partially verified · ⛔ blocked / un
 - Docker is not installed → compose stack cannot be run here.
 - PostgreSQL not installed → local runs use SQLite fallback; Postgres path only via compose.
 - No `YOUTUBE_API_KEY` → live YouTube path tested with mocked HTTP only.
+- **Windows DLL order**: torch loaded before pyarrow → access violation in worker threads (API segfault).
+  Fixed by importing pyarrow first in `src/__init__.py`; verified 0 access violations.
 - **Windows Smart App Control is ON** and blocks some unsigned binaries:
   - venv launcher from `uv venv` blocked → venv created with `python -m venv --copies .venv`.
   - pyarrow 25.0.1 and scikit-learn 1.9.1/1.8/1.7 native modules blocked → pinned
@@ -114,3 +116,28 @@ because tweet_eval 3-class macro-F1 is ~0.70 even for strong models; to be calib
 - Tests: 88 passed (added promotion engine, drift/MMD/decision engine, regression suite tests).
 
 **Next**: Phase 6 — YouTube ingestion wiring (adapter done + tested with mocks); then Phase 7/8 API + DB.
+
+### 2026-09-29 — Phases 6-8: Ingestion wiring, database, FastAPI
+**Done**
+- DB (`src/database/`): analyses, comments (unique source+comment id, no author fields), predictions,
+  embeddings (float16 bytes, 1.5 KB/comment), drift_events, model_events, monitored_videos. Repository layer.
+- Reference window per model version (`src/monitoring/reference.py`, 500 val texts, cached npz).
+- **Drift calibration on real v1 embeddings** (MMD²): null ≈ 0.000 (p≥0.46), demo comments 0.063,
+  slang drift window 0.117 → threshold 0.09, warning ratio 0.6 (recorded in `configs/drift.yaml`).
+- Service layer: `src/pipeline/analyze.py` (CLI `python -m src.pipeline.analyze --demo|--url`),
+  `model_service.py` (production model loaded once; alias re-checked every 30 s), `monitor.py`
+  (incremental polling via known ids, rolling window, background `MonitorWorker`).
+- Analytics + executive summary generated from stats; HTML (inline SVG) + Markdown report.
+- FastAPI: `/health`, `/api/v1/model`, `/analyze/youtube`, `/monitor/{start,stop,status}`,
+  `/drift/{latest,history}`, `/retraining/history`, `/report/{id}`, `/analyses`.
+
+**Bugs found & fixed**: MLflow 3 returns int versions (pydantic 500 on /health); pyarrow/torch DLL
+order segfault in API threadpool (see blockers).
+
+**Verified**: demo CLI analysis (300 comments → warning: language+prediction shift, embedding 0.063 < 0.09);
+curl of every endpoint (422 invalid URL, 400 live-without-key, 404 report); 15 new API/integration tests
+(temp SQLite + fake model) incl. incremental monitoring and no-retrain-below-minimum-samples.
+
+**Not verified**: live YouTube fetch (no key); PostgreSQL (no Docker).
+
+**Next**: Phase 9/10 — `scripts/simulate_drift.py` (stable vs shifted, drift report, trigger retraining).

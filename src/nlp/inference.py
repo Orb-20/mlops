@@ -63,7 +63,8 @@ class Predictor:
             preds.append(Prediction(
                 sentiment=self.sent_labels[k],
                 sentiment_confidence=round(float(s[k]), 4),
-                sentiment_probs={lbl: round(float(p), 4) for lbl, p in zip(self.sent_labels, s, strict=True)},
+                sentiment_probs={lbl: round(float(p), 4)
+                                 for lbl, p in zip(self.sent_labels, s, strict=True)},
                 toxicity_label=self.tox_labels[int(t >= self.threshold)],
                 toxicity_score=round(float(t), 4),
             ))
