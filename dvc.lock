@@ -77,3 +77,28 @@ stages:
       md5: b15516df658c248a2608e4b0ab698744.dir
       size: 5960873
       nfiles: 7
+  baseline:
+    cmd: python -m src.training.baseline
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: b15516df658c248a2608e4b0ab698744.dir
+      size: 5960873
+      nfiles: 7
+    - path: src/training/baseline.py
+      hash: md5
+      md5: fbe4d4625b2dc21f83fa90b37952e4a8
+      size: 3340
+    params:
+      configs/model.yaml:
+        baseline:
+          tfidf_max_features: 50000
+          ngram_range:
+          - 1
+          - 2
+          C: 4.0
+    outs:
+    - path: reports/evaluation/baseline_metrics.json
+      hash: md5
+      md5: 476df624594012a119295beae0421790
+      size: 837
