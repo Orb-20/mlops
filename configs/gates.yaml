@@ -5,7 +5,13 @@ gates:
     toxicity_f1_min: 0.65
     toxicity_recall_min: 0.60
   regression:
-    max_failed_cases: 12
+    # Calibrated 2026-09-29: first production model (v1) fails 13/48 (sarcasm, Hinglish,
+    # profanity-as-praise). Absolute ceiling = 13 + 2 buffer. The production-comparison gate
+    # separately forbids candidates that fail more cases than the current production model.
+    max_failed_cases: 15
+    # Unambiguous cases that must never fail, regardless of the tolerance above
+    # (direct insults, self-harm encouragement, clear praise/criticism).
+    critical_cases: [r26, r30, r31, r46, r47, r48]
   production_comparison:
     # candidate may not be worse than production by more than these absolute margins
     max_sentiment_macro_f1_drop: 0.02

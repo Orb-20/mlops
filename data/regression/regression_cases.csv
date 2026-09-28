@@ -1,0 +1,49 @@
+id,text,expected_sentiment,expected_toxicity,category,rationale
+r01,This is not bad at all.,positive|neutral,safe,negation,Negated negative reads as mild approval; not neutral-negative.
+r02,I don't hate it.,positive|neutral,safe,negation,Double negative expresses tolerance at worst.
+r03,This movie is not good.,negative,safe,negation,Negation flips the positive word; no insult.
+r04,Never been this disappointed by a trailer.,negative,safe,negation,Clear disappointment expressed through negation structure.
+r05,"Great job, genius.",negative|neutral|positive,safe|toxic,sarcasm,"Context-dependent sarcasm; accepted either way, recorded to observe behaviour."
+r06,Oh wonderful another ten minute ad break.,negative,safe,sarcasm,Sarcastic praise of ads; sentiment is negative; no attack on a person.
+r07,Wow what a totally original idea nobody has done before.,negative|neutral,safe,sarcasm,Sarcasm about originality; not directed abuse.
+r08,bro this is peak,positive,safe,slang,"Gen-Z slang: ""peak"" means excellent."
+r09,absolute cinema,positive,safe,slang,Meme phrase meaning outstanding.
+r10,this cooked fr,positive|neutral,safe,slang,"""cooked"" can mean excellent (it cooked) - ambiguous with ""we are cooked""."
+r11,mid,negative|neutral,safe,slang,"""mid"" = mediocre; mildly negative."
+r12,he fell off hard,negative,safe,slang,"""fell off"" = declined in quality; criticism, not abuse."
+r13,no cap this is the best song this year,positive,safe,slang,"""no cap"" = honestly; strongly positive."
+r14,lol,neutral|positive,safe,abbreviation,Laughter token with no target.
+r15,tbh idk why ppl like this,negative|neutral,safe,abbreviation,Mild doubt using abbreviations.
+r16,omg ty so much for this tutorial,positive,safe,abbreviation,Gratitude with abbreviations.
+r17,smh another clickbait title,negative,safe,abbreviation,Disapproval (shaking my head) at the title not a person.
+r18,bhai ye video bahut mast hai,positive,safe,mixed_language,"Hinglish: ""brother this video is great""."
+r19,yaar kya bakwas hai ye,negative,safe|toxic,mixed_language,"Hinglish ""what nonsense is this""; dismissive but not a personal slur. English model may not know it."
+r20,this song is ekdum kamaal,positive,safe,mixed_language,"Code-mixed ""totally amazing""."
+r21,Me encanta este video,positive,safe,mixed_language,Spanish: I love this video. Tests non-English robustness.
+r22,What the hell is this garbage,negative,safe|toxic,profanity,Profanity aimed at content; Jigsaw annotators often mark this toxic.
+r23,This fucking slaps,positive,safe|toxic,neutral_profanity,Profanity used as intensifier of praise.
+r24,Holy shit this is amazing,positive,safe|toxic,neutral_profanity,Expletive expressing excitement.
+r25,damn that guitar solo,positive|neutral,safe,neutral_profanity,Mild expletive expressing admiration.
+r26,You are an idiot.,negative,toxic,toxicity,Direct personal insult.
+r27,what a clown,negative,toxic,toxicity,Personal insult by comparison.
+r28,Shut up nobody asked you,negative,toxic,toxicity,Hostile dismissal of a person.
+r29,People like you should not be allowed to speak,negative,toxic,toxicity,Dehumanising exclusion directed at the reader.
+r30,Go kill yourself,negative,toxic,toxicity,Severe - encouragement of self-harm; must always be toxic.
+r31,You are a stupid ugly loser,negative,toxic,toxicity,Stacked personal insults.
+r32,I love you idiots so much,positive,safe|toxic,positive_toxicity_edge,Affectionate insult among friends; context-dependent.
+r33,You crazy genius you did it again,positive,safe,positive_toxicity_edge,"""crazy"" used as praise."
+r34,this beat is sick,positive,safe,positive_toxicity_edge,"""sick"" as slang for excellent."
+r35,I hate this movie.,negative,safe,negative_non_toxic,Strong dislike of a thing - negative but not toxic.
+r36,The audio quality is really poor in this one.,negative,safe,negative_non_toxic,Constructive criticism.
+r37,Sadly this was a waste of my evening.,negative,safe,negative_non_toxic,Disappointment without insult.
+r38,I disagree with your conclusion about the economy.,negative|neutral,safe,negative_non_toxic,Polite disagreement.
+r39,You are an idiot but I still love this channel,positive|negative|neutral,toxic,toxicity_non_negative,Insult is toxic even though overall sentiment is mixed/positive.
+r40,Hahaha you absolute moron this is hilarious,positive|neutral,safe|toxic,toxicity_non_negative,Playful insult with positive affect.
+r41,The video was uploaded on Tuesday.,neutral,safe,neutral,Pure factual statement.
+r42,What microphone do you use?,neutral,safe,neutral,Question with no sentiment.
+r43,It is what it is.,neutral|negative,safe,ambiguous,Resigned statement; ambiguous polarity.
+r44,Interesting.,neutral|positive,safe,ambiguous,Terse; could be sincere or dismissive.
+r45,I expected more but it was okay.,neutral|negative|positive,safe,ambiguous,Mixed expectation vs outcome.
+r46,Thank you so much this helped me pass my exam!,positive,safe,clear_positive,Unambiguous gratitude.
+r47,This is the best video on the topic.,positive,safe,clear_positive,Unambiguous praise.
+r48,Worst explanation ever. Completely useless.,negative,safe,clear_negative,Harsh content criticism with no personal attack.

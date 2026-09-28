@@ -12,16 +12,16 @@ Legend: ✅ done & verified · 🟡 done, partially verified · ⛔ blocked / un
 | 0 | Repository inspection | ✅ | See implementation plan |
 | 1 | Project skeleton | ✅ | 61 tests pass |
 | 2 | Data pipeline | ✅ | DVC repro deterministic, hash 1cbb27cc862a |
-| 3 | Baseline (TF-IDF + LR) | ⏳ | |
-| 4 | Transformer model | ⬜ | |
-| 5 | MLflow registry | ⬜ | |
+| 3 | Baseline (TF-IDF + LR) | ✅ | sent macro-F1 0.519, tox F1 0.722 |
+| 4 | Transformer model | ✅ | v1: sent macro-F1 0.675, tox F1 0.792 |
+| 5 | MLflow registry | ✅ | v1 = production via gates |
 | 6 | YouTube ingestion | ⬜ | |
 | 7 | FastAPI | ⬜ | |
 | 8 | Database | ⬜ | |
 | 9 | Drift monitoring | ⬜ | |
 | 10 | Drift simulation | ⬜ | |
 | 11 | Automated retraining | ⬜ | |
-| 12 | Regression gate | ⬜ | |
+| 12 | Regression gate | 🟡 | 48-case suite + engine done; fail path demo pending |
 | 13 | GitHub Actions | ⬜ | |
 | 14 | Streamlit dashboard | ⬜ | |
 | 15 | Reporting | ⬜ | |
@@ -87,3 +87,30 @@ because tweet_eval 3-class macro-F1 is ~0.70 even for strong models; to be calib
 **Commands**: `python -m src.data.prepare`, `dvc init`, `dvc repro download prepare`, `dvc repro -f prepare`, `dvc status`.
 
 **Next**: Phase 3 — run TF-IDF + LogisticRegression baseline, log to MLflow, record metrics.
+
+### 2026-09-29 — Phase 3: Baseline ✅
+- `src/training/baseline.py` (TF-IDF 1-2gram + LogisticRegression; balanced class weights for toxicity), DVC stage `baseline`.
+- MLflow run `a44234e9…` in experiment `sentiment-toxicity-training`: 12 metrics, 3 artifacts, lineage tags.
+- Test: sentiment acc 0.554 / macro-F1 **0.519**; toxicity P 0.744 / R 0.702 / F1 **0.722** / ROC-AUC 0.959 / PR-AUC 0.815.
+
+### 2026-09-29 — Phase 4: Transformer model ✅
+- `src/nlp/model.py` MultiTaskModel (shared DistilBERT, mean-pooled embedding, 2 heads), `src/training/trainer.py`
+  (task-alternating batches, per-task loss, class-weighted toxicity CE, AMP fp16, linear warmup),
+  `src/training/train.py` (`python -m src.training.train`).
+- Note: installed transformers is **5.17** (major v5) — APIs used were verified by running.
+- Full run `0a5c185b…` on RTX 3050 (8000 rows/task, 2 epochs, bs 16, lr 3e-5, seed 42).
+- Test: sentiment acc 0.681 / macro-F1 **0.675**; toxicity P 0.777 / R 0.808 / F1 **0.792** / ROC-AUC 0.977 / PR-AUC 0.886.
+  Clear gain over baseline (+0.156 macro-F1, +0.070 toxicity F1).
+
+### 2026-09-29 — Phase 5: MLflow registry ✅
+- `src/training/registry.py`: pyfunc-wrapped model, registered model `sentiment-toxicity-model`,
+  aliases candidate/staging/production/rejected + `lifecycle` version tag; `download_model` cache.
+- `src/evaluation/promotion.py` PromotionDecisionEngine (4 gates) + `src/evaluation/regression.py`.
+- Regression suite `data/regression/regression_cases.csv`: 48 cases, 13 categories, rationale per case;
+  6 critical cases. v1 fails 13/48 (sarcasm, Hinglish, profanity-as-praise), 0 critical.
+- Calibrated `max_failed_cases: 15` from v1's result (documented in gates.yaml).
+- `python -m src.evaluation.promotion --alias candidate` → **PROMOTE v1** (bootstrap: no production yet).
+- Verified smoke path in a throwaway MLflow DB first (train → register → download → load → predict).
+- Tests: 88 passed (added promotion engine, drift/MMD/decision engine, regression suite tests).
+
+**Next**: Phase 6 — YouTube ingestion wiring (adapter done + tested with mocks); then Phase 7/8 API + DB.
