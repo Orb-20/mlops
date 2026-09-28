@@ -31,6 +31,10 @@ drift:
     threshold: 0.10
     weight: 0.15
 
+  evidently:
+    enabled: true             # Evidently DataDriftPreset on language/sentiment/toxicity/length;
+                              # reported as supporting evidence, not voted
+
   vocabulary:
     enabled: true             # reported, not voted (supporting evidence only)
     top_k: 25

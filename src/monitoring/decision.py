@@ -40,6 +40,7 @@ class DriftDecision:
     retraining_recommended: bool
     signals: dict[str, dict]
     vocabulary: dict | None = None
+    evidently: dict | None = None  # supplementary per-column tests; never votes
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -128,6 +129,11 @@ class DriftDecisionEngine:
                 c["vocabulary"]["top_k"],
                 c["vocabulary"]["min_count"],
             )
+        evid = None
+        if c.get("evidently", {}).get("enabled"):
+            from src.monitoring.evidently_report import run_evidently  # avoid import cycle
+
+            evid = run_evidently(reference, current)
 
         return DriftDecision(
             drift_detected=drift,
@@ -141,4 +147,5 @@ class DriftDecisionEngine:
             retraining_recommended=drift,
             signals={k: s.to_dict() for k, s in signals.items()},
             vocabulary=vocab,
+            evidently=evid,
         )

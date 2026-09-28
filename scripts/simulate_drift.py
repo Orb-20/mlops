@@ -126,6 +126,19 @@ def main(argv: list[str] | None = None) -> int:
 
     rep_dir = project_path("reports", "drift")
     rep_dir.mkdir(parents=True, exist_ok=True)
+    # Evidently HTML report for the shifted window (supplementary column-level tests)
+    from src.monitoring.evidently_report import run_evidently
+    from src.monitoring.reference import get_reference, window_from_texts
+    from src.pipeline.model_service import get_model_service
+
+    predictor, info = get_model_service().get()
+    evid = run_evidently(
+        get_reference(predictor, info.version),
+        window_from_texts(predictor, windows["shifted"]),
+        rep_dir / f"evidently_shifted_{stamp}.html",
+    )
+    results["shifted"]["evidently"] = {k: v for k, v in evid.items() if k != "html"}
+    log.info("Evidently report: %s", evid.get("html", evid.get("error")))
     (rep_dir / f"drift_report_{stamp}.json").write_text(
         json.dumps(results, indent=2), encoding="utf-8"
     )
