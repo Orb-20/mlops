@@ -30,16 +30,29 @@ def _load(task: str, split: str) -> pd.DataFrame:
 
 
 def _pipeline(cfg: dict, seed: int, balanced: bool) -> Pipeline:
-    return Pipeline([
-        ("tfidf", TfidfVectorizer(
-            max_features=cfg["tfidf_max_features"], ngram_range=tuple(cfg["ngram_range"]),
-            sublinear_tf=True, lowercase=True, min_df=2,
-        )),
-        ("clf", LogisticRegression(
-            C=cfg["C"], max_iter=2000, random_state=seed,
-            class_weight="balanced" if balanced else None,
-        )),
-    ])
+    return Pipeline(
+        [
+            (
+                "tfidf",
+                TfidfVectorizer(
+                    max_features=cfg["tfidf_max_features"],
+                    ngram_range=tuple(cfg["ngram_range"]),
+                    sublinear_tf=True,
+                    lowercase=True,
+                    min_df=2,
+                ),
+            ),
+            (
+                "clf",
+                LogisticRegression(
+                    C=cfg["C"],
+                    max_iter=2000,
+                    random_state=seed,
+                    class_weight="balanced" if balanced else None,
+                ),
+            ),
+        ]
+    )
 
 
 def run_baseline() -> dict:
@@ -64,8 +77,13 @@ def run_baseline() -> dict:
         tr = _load("toxicity", "train")
         tox.fit(tr["text"], tr["label"])
         te = _load("toxicity", "test")
-        results.update(toxicity_metrics(te["label"], tox.predict_proba(te["text"])[:, 1],
-                                        cfg["inference"]["toxicity_threshold"]))
+        results.update(
+            toxicity_metrics(
+                te["label"],
+                tox.predict_proba(te["text"])[:, 1],
+                cfg["inference"]["toxicity_threshold"],
+            )
+        )
 
         mlflow.log_metric("training_seconds", time.time() - t0)
         mlflow.log_metrics({f"test_{k}": v for k, v in scalar_metrics(results).items()})
@@ -78,8 +96,12 @@ def run_baseline() -> dict:
 
     out = project_path("reports", "evaluation", "baseline_metrics.json")
     out.write_text(json.dumps(results, indent=2), encoding="utf-8")
-    log.info("Baseline run %s: sentiment macro-F1=%.4f toxicity F1=%.4f",
-             results["run_id"], results["sentiment_macro_f1"], results["toxicity_f1"])
+    log.info(
+        "Baseline run %s: sentiment macro-F1=%.4f toxicity F1=%.4f",
+        results["run_id"],
+        results["sentiment_macro_f1"],
+        results["toxicity_f1"],
+    )
     return results
 
 

@@ -28,12 +28,14 @@ def make_engine(url: str) -> Engine:
         kwargs["connect_args"] = {"check_same_thread": False, "timeout": 30}
     engine = create_engine(url, **kwargs)
     if url.startswith("sqlite"):
+
         @event.listens_for(engine, "connect")
         def _fk_on(dbapi_conn, _):  # pragma: no cover - trivial
             cur = dbapi_conn.cursor()
             cur.execute("PRAGMA foreign_keys=ON")
             cur.execute("PRAGMA journal_mode=WAL")
             cur.close()
+
     return engine
 
 

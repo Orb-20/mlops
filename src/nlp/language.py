@@ -19,14 +19,12 @@ DetectorFactory.seed = 0  # langdetect is non-deterministic without this
 
 REPORTED_LANGUAGES = ("en", "hi", "hinglish", "es", "other")
 
-HINGLISH_MARKERS = frozenset(
-    """
+HINGLISH_MARKERS = frozenset("""
     hai hain ho tha thi the nahi nahin nhi kya kyu kyun kaise kaisa kuch bahut bohot bhai yaar
     acha accha achha bhi aur mera meri mere tera teri tere apna apni hum tum aap ko ka ki ke se
     mein main mai hoga hogi raha rahi rahe wala wali wale sab abhi kab jab tab toh to bas matlab
     dekho dekh samajh pyaar pyar dil zindagi log logo sahi galat bilkul ekdum mast bekar bakwas
-    """.split()
-)
+    """.split())
 # Words that are also frequent English tokens: count them only as weak evidence.
 _AMBIGUOUS = frozenset({"to", "main", "the", "me", "he", "ho", "bas", "ko", "sab"})
 

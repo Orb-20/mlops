@@ -38,8 +38,9 @@ class Predictor:
         self.max_length = self.metadata.get("max_length", cfg["model"]["max_length"])
         self.batch_size = cfg["inference"]["batch_size"]
         # per-model calibrated threshold (validation-chosen) if the artifact has one
-        self.threshold = float(self.metadata.get("toxicity_threshold",
-                                                 cfg["inference"]["toxicity_threshold"]))
+        self.threshold = float(
+            self.metadata.get("toxicity_threshold", cfg["inference"]["toxicity_threshold"])
+        )
         self.sent_labels = self.metadata["sentiment_labels"]
         self.tox_labels = self.metadata["toxicity_labels"]
         log.info("Loaded model %s from %s on %s", version, model_dir, self.device)
@@ -49,8 +50,13 @@ class Predictor:
         embs, sprobs, tscores = [], [], []
         for i in range(0, len(texts), self.batch_size):
             batch = texts[i : i + self.batch_size]
-            enc = self.tokenizer(batch, padding=True, truncation=True,
-                                 max_length=self.max_length, return_tensors="pt").to(self.device)
+            enc = self.tokenizer(
+                batch,
+                padding=True,
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="pt",
+            ).to(self.device)
             out = self.model(enc["input_ids"], enc["attention_mask"])
             embs.append(out["embedding"].float().cpu().numpy())
             sprobs.append(torch.softmax(out["sentiment_logits"].float(), -1).cpu().numpy())
@@ -62,14 +68,17 @@ class Predictor:
         preds = []
         for s, t in zip(S, T, strict=True):
             k = int(s.argmax())
-            preds.append(Prediction(
-                sentiment=self.sent_labels[k],
-                sentiment_confidence=round(float(s[k]), 4),
-                sentiment_probs={lbl: round(float(p), 4)
-                                 for lbl, p in zip(self.sent_labels, s, strict=True)},
-                toxicity_label=self.tox_labels[int(t >= self.threshold)],
-                toxicity_score=round(float(t), 4),
-            ))
+            preds.append(
+                Prediction(
+                    sentiment=self.sent_labels[k],
+                    sentiment_confidence=round(float(s[k]), 4),
+                    sentiment_probs={
+                        lbl: round(float(p), 4) for lbl, p in zip(self.sent_labels, s, strict=True)
+                    },
+                    toxicity_label=self.tox_labels[int(t >= self.threshold)],
+                    toxicity_score=round(float(t), 4),
+                )
+            )
         return BatchOutput(preds, E, S, T)
 
     def embed(self, texts: list[str]) -> np.ndarray:

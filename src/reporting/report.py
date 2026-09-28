@@ -18,10 +18,20 @@ from src.data.schemas import utcnow
 from src.database.connection import session_scope
 from src.database.models import Analysis, DriftEvent, ModelEvent
 
-LANG_NAMES = {"en": "English", "hi": "Hindi", "hinglish": "Hinglish", "es": "Spanish",
-              "other": "Other"}
-COLORS = {"positive": "#2f9e6e", "neutral": "#8a8f98", "negative": "#d1495b", "safe": "#2f9e6e",
-          "toxic": "#d1495b"}
+LANG_NAMES = {
+    "en": "English",
+    "hi": "Hindi",
+    "hinglish": "Hinglish",
+    "es": "Spanish",
+    "other": "Other",
+}
+COLORS = {
+    "positive": "#2f9e6e",
+    "neutral": "#8a8f98",
+    "negative": "#d1495b",
+    "safe": "#2f9e6e",
+    "toxic": "#d1495b",
+}
 
 
 class ReportNotFound(LookupError):
@@ -45,9 +55,14 @@ def load_report_data(analysis_id: int) -> ReportData:
         ev = s.get(DriftEvent, a.drift_event_id) if a.drift_event_id else None
         mevents = []
         if ev is not None:
-            mevents = [_row(m) for m in s.scalars(
-                select(ModelEvent).where(ModelEvent.drift_event_id == ev.id)
-                .order_by(ModelEvent.id))]
+            mevents = [
+                _row(m)
+                for m in s.scalars(
+                    select(ModelEvent)
+                    .where(ModelEvent.drift_event_id == ev.id)
+                    .order_by(ModelEvent.id)
+                )
+            ]
         analysis, drift = _row(a), _row(ev) if ev else None
     return ReportData(analysis, drift, _model_meta(analysis["model_version"]), mevents, utcnow())
 
@@ -63,10 +78,15 @@ def _model_meta(version: str) -> dict:
 
         mv = registry.client().get_model_version(registry.registered_name(), version)
         prod = registry.get_version_by_alias("production")
-        meta.update({"run_id": mv.run_id, "dataset_version": mv.tags.get("dataset_version"),
-                     "git_commit": mv.tags.get("git_commit"),
-                     "lifecycle": mv.tags.get("lifecycle"),
-                     "current_production": prod.version if prod else None})
+        meta.update(
+            {
+                "run_id": mv.run_id,
+                "dataset_version": mv.tags.get("dataset_version"),
+                "git_commit": mv.tags.get("git_commit"),
+                "lifecycle": mv.tags.get("lifecycle"),
+                "current_production": prod.version if prod else None,
+            }
+        )
     except Exception as exc:  # noqa: BLE001 - report must still render if MLflow is down
         meta["registry_error"] = f"MLflow unavailable: {type(exc).__name__}"
     return meta
@@ -77,34 +97,42 @@ def svg_bars(values: dict[str, float], width: int = 420, color_map: dict | None 
     items = list(values.items())
     bar_h, gap, label_w = 22, 8, 90
     h = len(items) * (bar_h + gap)
-    parts = [f'<svg viewBox="0 0 {width} {h}" width="100%" role="img" '
-             f'style="max-width:{width}px">']
+    parts = [
+        f'<svg viewBox="0 0 {width} {h}" width="100%" role="img" ' f'style="max-width:{width}px">'
+    ]
     for i, (k, v) in enumerate(items):
         y = i * (bar_h + gap)
         w = max(0.0, min(1.0, v)) * (width - label_w - 60)
         col = (color_map or COLORS).get(k, "#4c6ef5")
-        parts.append(f'<text x="0" y="{y + 16}" font-size="13" fill="currentColor">'
-                     f'{html.escape(LANG_NAMES.get(k, k))}</text>'
-                     f'<rect x="{label_w}" y="{y}" width="{w:.1f}" height="{bar_h}" rx="3" '
-                     f'fill="{col}"/>'
-                     f'<text x="{label_w + w + 6:.1f}" y="{y + 16}" font-size="13" '
-                     f'fill="currentColor">{v:.1%}</text>')
+        parts.append(
+            f'<text x="0" y="{y + 16}" font-size="13" fill="currentColor">'
+            f"{html.escape(LANG_NAMES.get(k, k))}</text>"
+            f'<rect x="{label_w}" y="{y}" width="{w:.1f}" height="{bar_h}" rx="3" '
+            f'fill="{col}"/>'
+            f'<text x="{label_w + w + 6:.1f}" y="{y + 16}" font-size="13" '
+            f'fill="currentColor">{v:.1%}</text>'
+        )
     parts.append("</svg>")
     return "".join(parts)
 
 
-def svg_trend(trend: list[dict], key_colors: dict[str, str], width: int = 520,
-              height: int = 160) -> str:
+def svg_trend(
+    trend: list[dict], key_colors: dict[str, str], width: int = 520, height: int = 160
+) -> str:
     if len(trend) < 2:
         return "<p class='muted'>Not enough data points for a trend.</p>"
     pad = 30
     xs = [pad + i * (width - 2 * pad) / (len(trend) - 1) for i in range(len(trend))]
-    parts = [f'<svg viewBox="0 0 {width} {height}" width="100%" style="max-width:{width}px">',
-             f'<line x1="{pad}" y1="{height - pad}" x2="{width - pad}" y2="{height - pad}" '
-             f'stroke="#999" stroke-width="1"/>']
+    parts = [
+        f'<svg viewBox="0 0 {width} {height}" width="100%" style="max-width:{width}px">',
+        f'<line x1="{pad}" y1="{height - pad}" x2="{width - pad}" y2="{height - pad}" '
+        f'stroke="#999" stroke-width="1"/>',
+    ]
     for key, col in key_colors.items():
-        pts = " ".join(f"{x:.1f},{height - pad - t[key] * (height - 2 * pad):.1f}"
-                       for x, t in zip(xs, trend, strict=True))
+        pts = " ".join(
+            f"{x:.1f},{height - pad - t[key] * (height - 2 * pad):.1f}"
+            for x, t in zip(xs, trend, strict=True)
+        )
         parts.append(f'<polyline points="{pts}" fill="none" stroke="{col}" stroke-width="2"/>')
     legend = " ".join(f'<tspan fill="{c}">■ {k}</tspan>' for k, c in key_colors.items())
     parts.append(f'<text x="{pad}" y="14" font-size="12">{legend}</text></svg>')
@@ -122,30 +150,41 @@ def render_html(d: ReportData) -> str:
     mode_label = "LIVE YOUTUBE DATA" if a["mode"] == "live" else "DEMO DATA (synthetic)"
     e = html.escape
     vocab = ((dr or {}).get("details") or {}).get("vocabulary") or {}
-    rows_new = "".join(f"<tr><td>{e(t['term'])}</td><td>{t['count']}</td></tr>"
-                       for t in vocab.get("new_terms", [])[:12])
-    rows_top = "".join(f"<tr><td>{e(t['term'])}</td><td>{t['count']}</td></tr>"
-                       for t in vocab.get("top_current", [])[:12])
-    rows_shift = "".join(f"<tr><td>{e(t['term'])}</td><td>{t['count']}</td>"
-                         f"<td>{t['log2_ratio']:+.2f}</td></tr>"
-                         for t in vocab.get("frequency_shifts", [])[:12])
+    rows_new = "".join(
+        f"<tr><td>{e(t['term'])}</td><td>{t['count']}</td></tr>"
+        for t in vocab.get("new_terms", [])[:12]
+    )
+    rows_top = "".join(
+        f"<tr><td>{e(t['term'])}</td><td>{t['count']}</td></tr>"
+        for t in vocab.get("top_current", [])[:12]
+    )
+    rows_shift = "".join(
+        f"<tr><td>{e(t['term'])}</td><td>{t['count']}</td>" f"<td>{t['log2_ratio']:+.2f}</td></tr>"
+        for t in vocab.get("frequency_shifts", [])[:12]
+    )
     drift_rows = ""
     if dr:
         for key in ("embedding", "language", "prediction"):
             sig = (dr["details"].get("signals") or {}).get(key)
             if sig:
-                drift_rows += (f"<tr><td>{key.title()}</td><td>{sig['score']:.4f}</td>"
-                               f"<td>{sig['threshold']}</td><td>{_status_badge(sig['status'])}"
-                               f"</td></tr>")
+                drift_rows += (
+                    f"<tr><td>{key.title()}</td><td>{sig['score']:.4f}</td>"
+                    f"<td>{sig['threshold']}</td><td>{_status_badge(sig['status'])}"
+                    f"</td></tr>"
+                )
     ev_rows = "".join(
         f"<tr><td>{e(me['event_type'])}</td><td>v{e(str(me['model_version']))}</td>"
         f"<td><b>{e(me['decision'])}</b></td><td>{e(me['reason'])}</td></tr>"
-        for me in d.model_events)
-    retrain = (f"<table><tr><th>Event</th><th>Candidate</th><th>Decision</th><th>Reason</th></tr>"
-               f"{ev_rows}</table>" if ev_rows else
-               f"<p>Retraining status for this drift event: "
-               f"<b>{e((dr or {}).get('retraining_status', 'n/a'))}</b>. "
-               f"No candidate model has been evaluated for it yet.</p>")
+        for me in d.model_events
+    )
+    retrain = (
+        f"<table><tr><th>Event</th><th>Candidate</th><th>Decision</th><th>Reason</th></tr>"
+        f"{ev_rows}</table>"
+        if ev_rows
+        else f"<p>Retraining status for this drift event: "
+        f"<b>{e((dr or {}).get('retraining_status', 'n/a'))}</b>. "
+        f"No candidate model has been evaluated for it yet.</p>"
+    )
     trend = s.get("trend", [])
     trend_basis = "comment timestamp" if trend and trend[0].get("start") else "arrival order"
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -233,37 +272,54 @@ total-variation distance. Thresholds are configurable demonstration values.</p>
 def render_markdown(d: ReportData) -> str:
     a, s, dr, m = d.analysis, d.analysis["summary"], d.drift, d.model
     mode = "LIVE YOUTUBE DATA" if a["mode"] == "live" else "DEMO DATA (synthetic)"
-    pct = lambda dct: " · ".join(f"{LANG_NAMES.get(k, k)} {v:.1%}" for k, v in dct.items())  # noqa: E731
+
+    def pct(dct: dict) -> str:
+        return " · ".join(f"{LANG_NAMES.get(k, k)} {v:.1%}" for k, v in dct.items())
+
     lines = [
-        f"# Audience Analysis Report #{a['id']}", "",
-        f"**{mode}** · generated {d.generated_at:%Y-%m-%d %H:%M UTC}", "",
-        "## Executive summary", s["executive_summary"], "",
+        f"# Audience Analysis Report #{a['id']}",
+        "",
+        f"**{mode}** · generated {d.generated_at:%Y-%m-%d %H:%M UTC}",
+        "",
+        "## Executive summary",
+        s["executive_summary"],
+        "",
         "## Observed data",
         f"- Source: {a['source']} / `{a['content_id']}`",
         f"- Analysed: {a['created_at']:%Y-%m-%d %H:%M:%S UTC}",
         f"- Comments: {a['comment_count']}",
-        f"- Languages: {pct(s['languages'])}", "",
+        f"- Languages: {pct(s['languages'])}",
+        "",
         "## Model predictions",
         f"- Sentiment: {pct(s['sentiment'])} (avg confidence {s['sentiment_avg_confidence']:.1%})",
         f"- Toxicity: {pct(s['toxicity'])} (avg score {s['toxicity_avg_score']:.3f}, "
-        f"high-risk {s['high_risk_count']})", "",
+        f"high-risk {s['high_risk_count']})",
+        "",
         "## Drift signals",
     ]
     if dr:
         for k in ("embedding", "language", "prediction"):
             sig = (dr["details"].get("signals") or {}).get(k)
             if sig:
-                lines.append(f"- {k}: {sig['score']:.4f} (threshold {sig['threshold']}) "
-                             f"→ {sig['status']}")
+                lines.append(
+                    f"- {k}: {sig['score']:.4f} (threshold {sig['threshold']}) "
+                    f"→ {sig['status']}"
+                )
         lines.append(f"- **Overall: {dr['overall_status']}** ({dr['reason']})")
-    lines += ["", "## Model",
-              f"- {m['registered_model']} v{m['version']} ({m.get('lifecycle')})",
-              f"- run `{m.get('run_id')}` · dataset `{m.get('dataset_version')}` · "
-              f"commit `{m.get('git_commit')}`"]
+    lines += [
+        "",
+        "## Model",
+        f"- {m['registered_model']} v{m['version']} ({m.get('lifecycle')})",
+        f"- run `{m.get('run_id')}` · dataset `{m.get('dataset_version')}` · "
+        f"commit `{m.get('git_commit')}`",
+    ]
     if d.model_events:
         lines += ["", "## Retraining"]
-        lines += [f"- {me['event_type']}: v{me['model_version']} → **{me['decision']}** "
-                  f"({me['reason']})" for me in d.model_events]
+        lines += [
+            f"- {me['event_type']}: v{me['model_version']} → **{me['decision']}** "
+            f"({me['reason']})"
+            for me in d.model_events
+        ]
     return "\n".join(lines) + "\n"
 
 

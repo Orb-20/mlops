@@ -65,11 +65,20 @@ def log_and_register(model_dir: Path, run_id: str, tags: dict[str, str]) -> str:
             python_model=SentimentToxicityPyfunc(),
             artifacts={"model_dir": str(model_dir)},
             code_paths=[str(project_path("src"))],
-            pip_requirements=["torch", "transformers", "pandas", "numpy", "pydantic",
-                              "pyyaml", "pydantic-settings", "langdetect"],
+            pip_requirements=[
+                "torch",
+                "transformers",
+                "pandas",
+                "numpy",
+                "pydantic",
+                "pyyaml",
+                "pydantic-settings",
+                "langdetect",
+            ],
         )
-        mv = mlflow.register_model(info.model_uri, name,
-                                   tags={**tags, "run_id": run_id, "lifecycle": "candidate"})
+        mv = mlflow.register_model(
+            info.model_uri, name, tags={**tags, "run_id": run_id, "lifecycle": "candidate"}
+        )
         c = client()
         c.set_registered_model_alias(name, "candidate", mv.version)
     except MlflowException as exc:
@@ -97,13 +106,13 @@ def promote_to_production(version: str) -> str | None:
     Returns previous production version (or None)."""
     prev = get_version_by_alias("production")
     c, name = client(), registered_name()
-    if prev is not None and prev.version != version:
+    if prev is not None and str(prev.version) != str(version):
         c.set_model_version_tag(name, prev.version, "lifecycle", "archived")
     set_lifecycle(version, "production")
     cand = get_version_by_alias("candidate")
-    if cand is not None and cand.version == version:
+    if cand is not None and str(cand.version) == str(version):
         c.delete_registered_model_alias(name, "candidate")
-    return prev.version if prev else None
+    return str(prev.version) if prev else None
 
 
 def reject(version: str, reason: str) -> None:
@@ -111,7 +120,7 @@ def reject(version: str, reason: str) -> None:
     set_lifecycle(version, "rejected")
     c.set_model_version_tag(name, version, "rejection_reason", reason[:500])
     cand = get_version_by_alias("candidate")
-    if cand is not None and cand.version == version:
+    if cand is not None and str(cand.version) == str(version):
         c.delete_registered_model_alias(name, "candidate")
 
 
@@ -129,10 +138,18 @@ def list_versions() -> list[dict]:
     for a, v in aliases.items():
         by_version.setdefault(str(v), []).append(a)
     return sorted(
-        [{"version": v.version, "run_id": v.run_id, "created": v.creation_timestamp,
-          "aliases": by_version.get(str(v.version), []), "tags": dict(v.tags)}
-         for v in versions],
-        key=lambda d: int(d["version"]), reverse=True,
+        [
+            {
+                "version": v.version,
+                "run_id": v.run_id,
+                "created": v.creation_timestamp,
+                "aliases": by_version.get(str(v.version), []),
+                "tags": dict(v.tags),
+            }
+            for v in versions
+        ],
+        key=lambda d: int(d["version"]),
+        reverse=True,
     )
 
 

@@ -37,14 +37,17 @@ def test_live_without_key_400(client, monkeypatch):
 
     monkeypatch.setenv("YOUTUBE_API_KEY", "")
     settings.get_env.cache_clear()
-    r = client.post("/api/v1/analyze/youtube",
-                    json={"url": "https://youtu.be/dQw4w9WgXcQ", "mode": "live"})
+    r = client.post(
+        "/api/v1/analyze/youtube", json={"url": "https://youtu.be/dQw4w9WgXcQ", "mode": "live"}
+    )
     assert r.status_code == 400 and "YOUTUBE_API_KEY" in r.json()["detail"]
 
 
 def test_max_comments_validation(client):
-    assert client.post("/api/v1/analyze/youtube",
-                       json={"mode": "demo", "max_comments": 0}).status_code == 422
+    assert (
+        client.post("/api/v1/analyze/youtube", json={"mode": "demo", "max_comments": 0}).status_code
+        == 422
+    )
 
 
 def test_drift_endpoints(client):

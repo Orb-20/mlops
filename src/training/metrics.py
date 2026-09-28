@@ -52,8 +52,9 @@ def toxicity_metrics(y_true, y_score, threshold: float = 0.5) -> dict:
     return out
 
 
-def calibrate_threshold(y_true, y_score, lo: float = 0.05, hi: float = 0.95,
-                        step: float = 0.01) -> float:
+def calibrate_threshold(
+    y_true, y_score, lo: float = 0.05, hi: float = 0.95, step: float = 0.01
+) -> float:
     """F1-optimal decision threshold on a VALIDATION set (never the test set).
     Ties resolve to the threshold closest to 0.5."""
     y_true, y_score = np.asarray(y_true), np.asarray(y_score, dtype=float)

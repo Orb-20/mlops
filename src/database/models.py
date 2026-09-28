@@ -39,8 +39,7 @@ class Analysis(Base):
     model_version: Mapped[str] = mapped_column(String(32))
     comment_count: Mapped[int] = mapped_column(Integer)
     summary: Mapped[dict] = mapped_column(JSON)
-    drift_event_id: Mapped[int | None] = mapped_column(ForeignKey("drift_events.id"),
-                                                       nullable=True)
+    drift_event_id: Mapped[int | None] = mapped_column(ForeignKey("drift_events.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -64,8 +63,9 @@ class PredictionRow(Base):
     __tablename__ = "predictions"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     comment_id: Mapped[int] = mapped_column(ForeignKey("comments.id"), index=True)
-    analysis_id: Mapped[int | None] = mapped_column(ForeignKey("analyses.id"), index=True,
-                                                    nullable=True)
+    analysis_id: Mapped[int | None] = mapped_column(
+        ForeignKey("analyses.id"), index=True, nullable=True
+    )
     model_version: Mapped[str] = mapped_column(String(32))
     sentiment: Mapped[str] = mapped_column(String(16))
     sentiment_confidence: Mapped[float] = mapped_column(Float)
@@ -111,8 +111,7 @@ class ModelEvent(Base):
     model_version: Mapped[str] = mapped_column(String(32))
     production_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     event_type: Mapped[str] = mapped_column(String(32))  # retraining | promotion_decision | ...
-    drift_event_id: Mapped[int | None] = mapped_column(ForeignKey("drift_events.id"),
-                                                       nullable=True)
+    drift_event_id: Mapped[int | None] = mapped_column(ForeignKey("drift_events.id"), nullable=True)
     run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     candidate_metrics: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     production_metrics: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -131,7 +130,6 @@ class MonitoredVideo(Base):
     mode: Mapped[str] = mapped_column(String(8))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     poll_interval_seconds: Mapped[int] = mapped_column(Integer)
-    last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
-                                                            nullable=True)
+    last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_status: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

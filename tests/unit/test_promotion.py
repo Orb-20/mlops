@@ -3,16 +3,27 @@ import pytest
 from src.evaluation.promotion import GateResult, PromotionDecisionEngine, check_artifact
 
 GATES = {
-    "minimum_metrics": {"sentiment_macro_f1_min": 0.6, "toxicity_f1_min": 0.65,
-                        "toxicity_recall_min": 0.6},
+    "minimum_metrics": {
+        "sentiment_macro_f1_min": 0.6,
+        "toxicity_f1_min": 0.65,
+        "toxicity_recall_min": 0.6,
+    },
     "regression": {"max_failed_cases": 5},
-    "production_comparison": {"max_sentiment_macro_f1_drop": 0.02, "max_toxicity_f1_drop": 0.02,
-                              "max_toxicity_recall_drop": 0.03,
-                              "max_additional_regression_failures": 1},
+    "production_comparison": {
+        "max_sentiment_macro_f1_drop": 0.02,
+        "max_toxicity_f1_drop": 0.02,
+        "max_toxicity_recall_drop": 0.03,
+        "max_additional_regression_failures": 1,
+    },
 }
 GOOD = {"sentiment_macro_f1": 0.70, "toxicity_f1": 0.75, "toxicity_recall": 0.80}
-REG_OK = {"passed": True, "failed": 3, "max_failed_cases": 5, "failed_ids": ["a", "b", "c"],
-          "critical_failed_ids": []}
+REG_OK = {
+    "passed": True,
+    "failed": 3,
+    "max_failed_cases": 5,
+    "failed_ids": ["a", "b", "c"],
+    "critical_failed_ids": [],
+}
 ART_OK = GateResult("artifact_validity", True, {})
 
 
@@ -31,8 +42,12 @@ def test_better_candidate_promoted(engine):
     prod = {"sentiment_macro_f1": 0.68, "toxicity_f1": 0.74, "toxicity_recall": 0.79}
     d = engine.decide("5", GOOD, REG_OK, ART_OK, "4", prod, REG_OK)
     assert d.decision == "PROMOTE"
-    assert d.reasons == ["artifact_valid", "minimum_metrics_passed", "regression_tests_passed",
-                         "no_critical_metric_regression"]
+    assert d.reasons == [
+        "artifact_valid",
+        "minimum_metrics_passed",
+        "regression_tests_passed",
+        "no_critical_metric_regression",
+    ]
 
 
 def test_small_drop_within_margin_is_allowed(engine):

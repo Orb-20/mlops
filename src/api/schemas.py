@@ -119,6 +119,7 @@ class ModelEventOut(BaseModel):
     regression: dict[str, Any] | None
     decision: str
     reason: str
+    details: dict[str, Any] | None = None
     created_at: datetime
 
 

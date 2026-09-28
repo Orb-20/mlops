@@ -57,8 +57,10 @@ class MultiTaskModel(nn.Module):
         self.encoder.save_pretrained(directory / "encoder")
         tokenizer.save_pretrained(directory / "tokenizer")
         torch.save(
-            {"sentiment_head": self.sentiment_head.state_dict(),
-             "toxicity_head": self.toxicity_head.state_dict()},
+            {
+                "sentiment_head": self.sentiment_head.state_dict(),
+                "toxicity_head": self.toxicity_head.state_dict(),
+            },
             directory / "heads.pt",
         )
         meta = {

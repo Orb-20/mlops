@@ -48,8 +48,13 @@ def fake_model(monkeypatch):
     monkeypatch.setattr(model_service, "_service", FakeService())
     ref_texts = [f"reference comment number {i} about a good video" for i in range(120)]
     out = pred.run(ref_texts)
-    ref = WindowData(out.embeddings, ["en"] * 120, [p.sentiment for p in out.predictions],
-                     [p.toxicity_label for p in out.predictions], ref_texts)
+    ref = WindowData(
+        out.embeddings,
+        ["en"] * 120,
+        [p.sentiment for p in out.predictions],
+        [p.toxicity_label for p in out.predictions],
+        ref_texts,
+    )
     monkeypatch.setattr(analyze, "get_reference", lambda p, v: ref)
     monkeypatch.setattr(reference, "get_reference", lambda p, v, rebuild=False: ref)
     return pred

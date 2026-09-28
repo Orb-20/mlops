@@ -45,8 +45,11 @@ class DriftDecision:
         return asdict(self)
 
 
-REASON_NAMES = {"embedding": "embedding_drift", "language": "language_distribution_shift",
-                "prediction": "prediction_distribution_shift"}
+REASON_NAMES = {
+    "embedding": "embedding_drift",
+    "language": "language_distribution_shift",
+    "prediction": "prediction_distribution_shift",
+}
 
 
 class DriftDecisionEngine:
@@ -62,27 +65,47 @@ class DriftDecisionEngine:
         signals: dict[str, SignalResult] = {}
 
         if n < c["minimum_samples"]:
-            return DriftDecision(False, "none", "insufficient_data",
-                                 [f"only {n} samples (< minimum_samples={c['minimum_samples']})"],
-                                 {}, {}, n, 0.0, False, {})
+            return DriftDecision(
+                False,
+                "none",
+                "insufficient_data",
+                [f"only {n} samples (< minimum_samples={c['minimum_samples']})"],
+                {},
+                {},
+                n,
+                0.0,
+                False,
+                {},
+            )
 
         if c["embedding"]["enabled"]:
-            signals["embedding"] = embedding_drift(reference.embeddings, current.embeddings,
-                                                   c["embedding"], wr, self.seed)
+            signals["embedding"] = embedding_drift(
+                reference.embeddings, current.embeddings, c["embedding"], wr, self.seed
+            )
         if c["language"]["enabled"]:
             langs = list(REPORTED_LANGUAGES)
             signals["language"] = categorical_drift(
-                "language", {"language": proportions(reference.languages, langs)},
-                {"language": proportions(current.languages, langs)}, c["language"], wr)
+                "language",
+                {"language": proportions(reference.languages, langs)},
+                {"language": proportions(current.languages, langs)},
+                c["language"],
+                wr,
+            )
         if c["prediction"]["enabled"]:
             s, t = list(SENTIMENT_LABELS), list(TOXICITY_LABELS)
             signals["prediction"] = categorical_drift(
                 "prediction",
-                {"sentiment": proportions(reference.sentiments, s),
-                 "toxicity": proportions(reference.toxicity_labels, t)},
-                {"sentiment": proportions(current.sentiments, s),
-                 "toxicity": proportions(current.toxicity_labels, t)},
-                c["prediction"], wr)
+                {
+                    "sentiment": proportions(reference.sentiments, s),
+                    "toxicity": proportions(reference.toxicity_labels, t),
+                },
+                {
+                    "sentiment": proportions(current.sentiments, s),
+                    "toxicity": proportions(current.toxicity_labels, t),
+                },
+                c["prediction"],
+                wr,
+            )
 
         total_w = sum(c[k]["weight"] for k in signals) or 1.0
         weighted = sum(c[k]["weight"] * sig.drifted for k, sig in signals.items()) / total_w
@@ -99,14 +122,23 @@ class DriftDecisionEngine:
 
         vocab = None
         if c.get("vocabulary", {}).get("enabled") and reference.texts and current.texts:
-            vocab = vocabulary_report(reference.texts, current.texts,
-                                      c["vocabulary"]["top_k"], c["vocabulary"]["min_count"])
+            vocab = vocabulary_report(
+                reference.texts,
+                current.texts,
+                c["vocabulary"]["top_k"],
+                c["vocabulary"]["min_count"],
+            )
 
         return DriftDecision(
-            drift_detected=drift, severity=severity, overall_status=status, reasons=reasons,
+            drift_detected=drift,
+            severity=severity,
+            overall_status=status,
+            reasons=reasons,
             scores={k: s.score for k, s in signals.items()},
             thresholds={k: s.threshold for k, s in signals.items()},
-            sample_count=n, weighted_score=round(weighted, 4),
+            sample_count=n,
+            weighted_score=round(weighted, 4),
             retraining_recommended=drift,
-            signals={k: s.to_dict() for k, s in signals.items()}, vocabulary=vocab,
+            signals={k: s.to_dict() for k, s in signals.items()},
+            vocabulary=vocab,
         )

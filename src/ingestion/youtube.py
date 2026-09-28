@@ -34,8 +34,16 @@ from src.ingestion.base import (
 log = logging.getLogger(__name__)
 
 _VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
-_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
-          "youtu.be", "www.youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com"}
+_HOSTS = {
+    "youtube.com",
+    "www.youtube.com",
+    "m.youtube.com",
+    "music.youtube.com",
+    "youtu.be",
+    "www.youtu.be",
+    "youtube-nocookie.com",
+    "www.youtube-nocookie.com",
+}
 DEMO_CONTENT_ID = "demo"
 
 
@@ -112,10 +120,14 @@ class YouTubeAdapter(SocialMediaAdapter):
                     except ValueError as exc:
                         raise SourceUnavailableError("YouTube returned malformed JSON") from exc
                 reason = self._error_reason(r)
-                if r.status_code == 403 and reason in ("quotaExceeded", "dailyLimitExceeded",
-                                                       "rateLimitExceeded"):
-                    raise QuotaExceededError("YouTube API quota exceeded; try again later "
-                                             "or use demo data.")
+                if r.status_code == 403 and reason in (
+                    "quotaExceeded",
+                    "dailyLimitExceeded",
+                    "rateLimitExceeded",
+                ):
+                    raise QuotaExceededError(
+                        "YouTube API quota exceeded; try again later " "or use demo data."
+                    )
                 if r.status_code == 403 and reason == "commentsDisabled":
                     raise CommentsDisabledError("Comments are disabled for this video.")
                 if r.status_code == 404 or reason in ("videoNotFound", "forbidden"):
@@ -140,8 +152,9 @@ class YouTubeAdapter(SocialMediaAdapter):
             return ""
 
     # -- public ------------------------------------------------------------------------------
-    def fetch_comments(self, content_id: str, max_comments: int = 300,
-                       known_ids: set[str] | None = None) -> FetchResult:
+    def fetch_comments(
+        self, content_id: str, max_comments: int = 300, known_ids: set[str] | None = None
+    ) -> FetchResult:
         if not self.api_key:
             raise MissingAPIKeyError(
                 "YOUTUBE_API_KEY is not set. Add it to .env for live data, or use demo data."
@@ -152,9 +165,13 @@ class YouTubeAdapter(SocialMediaAdapter):
         page_token: str | None = None
         log.info("Fetching YouTube comments for %s (max %d)", content_id, max_comments)
         while len(comments) < max_comments:
-            params = {"part": "snippet,replies", "videoId": content_id, "textFormat": "plainText",
-                      "order": "time",
-                      "maxResults": min(self.page_size, 100)}
+            params = {
+                "part": "snippet,replies",
+                "videoId": content_id,
+                "textFormat": "plainText",
+                "order": "time",
+                "maxResults": min(self.page_size, 100),
+            }
             if page_token:
                 params["pageToken"] = page_token
             data = self._get(params)
@@ -188,9 +205,14 @@ class YouTubeAdapter(SocialMediaAdapter):
         sn = c.get("snippet", {})
         text = clean_text(sn.get("textDisplay") or sn.get("textOriginal") or "")
         try:
-            return CommentRecord(source="youtube", source_content_id=content_id,
-                                 source_comment_id=c["id"], parent_comment_id=parent, text=text,
-                                 timestamp=_parse_ts(sn.get("publishedAt")))
+            return CommentRecord(
+                source="youtube",
+                source_content_id=content_id,
+                source_comment_id=c["id"],
+                parent_comment_id=parent,
+                text=text,
+                timestamp=_parse_ts(sn.get("publishedAt")),
+            )
         except (ValidationError, KeyError):
             return None
 
@@ -213,8 +235,9 @@ class DemoAdapter(SocialMediaAdapter):
         vid = parse_video_id(url or "")
         return vid or DEMO_CONTENT_ID
 
-    def fetch_comments(self, content_id: str, max_comments: int = 300,
-                       known_ids: set[str] | None = None) -> FetchResult:
+    def fetch_comments(
+        self, content_id: str, max_comments: int = 300, known_ids: set[str] | None = None
+    ) -> FetchResult:
         df = pd.read_csv(self.path)
         known_ids = known_ids or set()
         out, skipped = [], 0
@@ -223,11 +246,16 @@ class DemoAdapter(SocialMediaAdapter):
             if cid in known_ids:
                 continue
             try:
-                out.append(CommentRecord(
-                    source="youtube", source_content_id=content_id, source_comment_id=cid,
-                    parent_comment_id=None, text=clean_text(str(row.text)),
-                    timestamp=_parse_ts(str(row.published_at)),
-                ))
+                out.append(
+                    CommentRecord(
+                        source="youtube",
+                        source_content_id=content_id,
+                        source_comment_id=cid,
+                        parent_comment_id=None,
+                        text=clean_text(str(row.text)),
+                        timestamp=_parse_ts(str(row.published_at)),
+                    )
+                )
             except ValidationError:
                 skipped += 1
             if len(out) >= max_comments:

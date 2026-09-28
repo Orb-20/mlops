@@ -112,12 +112,12 @@ stages:
       nfiles: 7
     - path: scripts/simulate_drift.py
       hash: md5
-      md5: 8b9f9f15a71e4a5592a8b01609d0e720
-      size: 6386
+      md5: 379f64435fdc5b397c6cf2660e1645f7
+      size: 6565
     outs:
     - path: data/drift
       hash: md5
-      md5: 7838bd072e7b2a597db150dd339fc0ca.dir
+      md5: d73f3ac3e25eea977acf65e3afafba29.dir
       size: 34552
       nfiles: 4
   validate_curated:

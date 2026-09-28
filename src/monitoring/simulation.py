@@ -16,8 +16,20 @@ import random
 import pandas as pd
 
 # (template, sentiment, toxicity). {s} = subject filler, {e} = emphasis filler.
-SUBJECTS = ["this", "the edit", "this song", "the beat", "this video", "the ending", "bro",
-            "the vocals", "this collab", "the drop", "this episode", "the thumbnail"]
+SUBJECTS = [
+    "this",
+    "the edit",
+    "this song",
+    "the beat",
+    "this video",
+    "the ending",
+    "bro",
+    "the vocals",
+    "this collab",
+    "the drop",
+    "this episode",
+    "the thumbnail",
+]
 EMPH = ["fr", "ngl", "lowkey", "highkey", "no cap", "fr fr", "deadass", "istg", "", ""]
 
 TEMPLATES: list[tuple[str, str, str]] = [
@@ -99,8 +111,9 @@ def template_split(seed: int, test_frac: float = 0.3) -> dict[int, str]:
     return assign
 
 
-def build_drift_dataset(n_train: int = 1200, n_test: int = 400, n_window: int = 300,
-                        seed: int = 42) -> dict[str, pd.DataFrame]:
+def build_drift_dataset(
+    n_train: int = 1200, n_test: int = 400, n_window: int = 300, seed: int = 42
+) -> dict[str, pd.DataFrame]:
     """Returns train/test (labelled) and window (unlabelled texts that simulate a new stream).
     The monitoring window uses templates from both splits, like a real incoming stream."""
     rng = random.Random(seed)
@@ -117,8 +130,15 @@ def build_drift_dataset(n_train: int = 1200, n_test: int = 400, n_window: int = 
             if text in seen:
                 continue
             seen.add(text)
-            rows.append({"text": text, "sentiment": TEMPLATES[i][1],
-                         "toxicity": TEMPLATES[i][2], "template_id": i, "split": split})
+            rows.append(
+                {
+                    "text": text,
+                    "sentiment": TEMPLATES[i][1],
+                    "toxicity": TEMPLATES[i][2],
+                    "template_id": i,
+                    "split": split,
+                }
+            )
         return pd.DataFrame(rows)
 
     train = make("train", n_train, pools["train"])

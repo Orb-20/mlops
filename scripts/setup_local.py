@@ -51,8 +51,10 @@ def main(argv: list[str] | None = None) -> int:
     decision = run_promotion(res.version)
     log.info("Bootstrap model v%s: %s %s", res.version, decision.decision, decision.reasons)
     if decision.decision != "PROMOTE":
-        log.error("The bootstrap model did not pass the gates (see reasons above). Increase "
-                  "--max-train/--epochs; the gates in configs/gates.yaml are not bypassed.")
+        log.error(
+            "The bootstrap model did not pass the gates (see reasons above). Increase "
+            "--max-train/--epochs; the gates in configs/gates.yaml are not bypassed."
+        )
         return 3
     return 0
 

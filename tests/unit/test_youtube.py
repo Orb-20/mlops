@@ -14,25 +14,35 @@ from src.ingestion.youtube import DemoAdapter, YouTubeAdapter, parse_video_id
 VID = "dQw4w9WgXcQ"
 
 
-@pytest.mark.parametrize("url", [
-    f"https://www.youtube.com/watch?v={VID}",
-    f"https://youtube.com/watch?v={VID}&t=42s",
-    f"youtube.com/watch?feature=share&v={VID}",
-    f"https://youtu.be/{VID}?si=abc",
-    f"https://www.youtube.com/shorts/{VID}",
-    f"https://m.youtube.com/watch?v={VID}",
-    f"https://www.youtube.com/embed/{VID}",
-    VID,
-])
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"https://www.youtube.com/watch?v={VID}",
+        f"https://youtube.com/watch?v={VID}&t=42s",
+        f"youtube.com/watch?feature=share&v={VID}",
+        f"https://youtu.be/{VID}?si=abc",
+        f"https://www.youtube.com/shorts/{VID}",
+        f"https://m.youtube.com/watch?v={VID}",
+        f"https://www.youtube.com/embed/{VID}",
+        VID,
+    ],
+)
 def test_parse_valid(url):
     assert parse_video_id(url) == VID
 
 
-@pytest.mark.parametrize("url", [
-    "", "hello", "https://vimeo.com/123", f"https://evil.com/watch?v={VID}",
-    "https://www.youtube.com/watch?v=short", "https://www.youtube.com/channel/UCabc",
-    None,
-])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "",
+        "hello",
+        "https://vimeo.com/123",
+        f"https://evil.com/watch?v={VID}",
+        "https://www.youtube.com/watch?v=short",
+        "https://www.youtube.com/channel/UCabc",
+        None,
+    ],
+)
 def test_parse_invalid(url):
     assert parse_video_id(url) is None
 
@@ -43,13 +53,25 @@ def test_extract_raises_on_invalid():
 
 
 def _thread(cid, text, replies=()):
-    item = {"snippet": {"topLevelComment": {"id": cid, "snippet": {
-        "textDisplay": text, "publishedAt": "2026-01-01T00:00:00Z",
-        "authorDisplayName": "should-not-be-stored"}}}}
+    item = {
+        "snippet": {
+            "topLevelComment": {
+                "id": cid,
+                "snippet": {
+                    "textDisplay": text,
+                    "publishedAt": "2026-01-01T00:00:00Z",
+                    "authorDisplayName": "should-not-be-stored",
+                },
+            }
+        }
+    }
     if replies:
-        item["replies"] = {"comments": [
-            {"id": rid, "snippet": {"textDisplay": rt, "publishedAt": "2026-01-01T01:00:00Z"}}
-            for rid, rt in replies]}
+        item["replies"] = {
+            "comments": [
+                {"id": rid, "snippet": {"textDisplay": rt, "publishedAt": "2026-01-01T01:00:00Z"}}
+                for rid, rt in replies
+            ]
+        }
     return item
 
 
@@ -61,8 +83,10 @@ def _adapter(handler, key="test-key"):
 
 def test_pagination_replies_and_max():
     pages = {
-        None: {"items": [_thread("c1", "great video", [("r1", "agreed")]), _thread("c2", "meh")],
-               "nextPageToken": "p2"},
+        None: {
+            "items": [_thread("c1", "great video", [("r1", "agreed")]), _thread("c2", "meh")],
+            "nextPageToken": "p2",
+        },
         "p2": {"items": [_thread("c3", "third"), _thread("c4", "fourth")]},
     }
 
@@ -87,8 +111,9 @@ def test_known_ids_are_skipped_for_incremental_monitoring():
 
 def test_malformed_items_counted_not_crashing():
     def handler(req):
-        return httpx.Response(200, json={"items": [{"bad": 1}, _thread("c1", "ok"),
-                                                   _thread("c2", "   ")]})
+        return httpx.Response(
+            200, json={"items": [{"bad": 1}, _thread("c1", "ok"), _thread("c2", "   ")]}
+        )
 
     res = _adapter(handler).fetch_comments(VID)
     assert len(res.comments) == 1 and res.skipped_malformed == 2
@@ -109,12 +134,15 @@ def _err(status, reason):
     return lambda req: httpx.Response(status, json={"error": {"errors": [{"reason": reason}]}})
 
 
-@pytest.mark.parametrize("status,reason,exc", [
-    (403, "quotaExceeded", QuotaExceededError),
-    (403, "commentsDisabled", CommentsDisabledError),
-    (404, "videoNotFound", ContentNotFoundError),
-    (400, "keyInvalid", MissingAPIKeyError),
-])
+@pytest.mark.parametrize(
+    "status,reason,exc",
+    [
+        (403, "quotaExceeded", QuotaExceededError),
+        (403, "commentsDisabled", CommentsDisabledError),
+        (404, "videoNotFound", ContentNotFoundError),
+        (400, "keyInvalid", MissingAPIKeyError),
+    ],
+)
 def test_api_errors(status, reason, exc):
     with pytest.raises(exc):
         _adapter(_err(status, reason)).fetch_comments(VID)

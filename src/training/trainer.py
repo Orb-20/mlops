@@ -47,16 +47,23 @@ def class_weights(labels: pd.Series, n: int) -> torch.Tensor:
 
 
 @torch.inference_mode()
-def evaluate(model: MultiTaskModel, tokenizer, data: dict[str, pd.DataFrame], cfg: TrainConfig,
-             device, threshold: float = 0.5) -> dict:
+def evaluate(
+    model: MultiTaskModel,
+    tokenizer,
+    data: dict[str, pd.DataFrame],
+    cfg: TrainConfig,
+    device,
+    threshold: float = 0.5,
+) -> dict:
     model.eval()
     out: dict = {}
     for task, df in data.items():
         loader = make_loader(df, tokenizer, cfg.max_length, cfg.eval_batch_size, False, cfg.seed)
         scores = []
         for batch in loader:
-            logits = model(batch["input_ids"].to(device), batch["attention_mask"].to(device),
-                           task=task)[f"{task}_logits"]
+            logits = model(
+                batch["input_ids"].to(device), batch["attention_mask"].to(device), task=task
+            )[f"{task}_logits"]
             scores.append(torch.softmax(logits.float(), -1).cpu().numpy())
         probs = np.concatenate(scores)
         y = df["label"].to_numpy()
@@ -67,24 +74,33 @@ def evaluate(model: MultiTaskModel, tokenizer, data: dict[str, pd.DataFrame], cf
     return out
 
 
-def train(model: MultiTaskModel, tokenizer, train_data: dict[str, pd.DataFrame],
-          val_data: dict[str, pd.DataFrame], cfg: TrainConfig, device,
-          on_epoch_end=None) -> dict:
+def train(
+    model: MultiTaskModel,
+    tokenizer,
+    train_data: dict[str, pd.DataFrame],
+    val_data: dict[str, pd.DataFrame],
+    cfg: TrainConfig,
+    device,
+    on_epoch_end=None,
+) -> dict:
     model.to(device)
-    loaders = {t: make_loader(df, tokenizer, cfg.max_length, cfg.batch_size, True, cfg.seed)
-               for t, df in train_data.items()}
+    loaders = {
+        t: make_loader(df, tokenizer, cfg.max_length, cfg.batch_size, True, cfg.seed)
+        for t, df in train_data.items()
+    }
     loss_fns = {
         "sentiment": nn.CrossEntropyLoss(),
-        "toxicity": nn.CrossEntropyLoss(
-            weight=class_weights(train_data["toxicity"]["label"], 2).to(device)
-        ) if "toxicity" in train_data else None,
+        "toxicity": (
+            nn.CrossEntropyLoss(weight=class_weights(train_data["toxicity"]["label"], 2).to(device))
+            if "toxicity" in train_data
+            else None
+        ),
     }
     task_weight = {"sentiment": 1.0, "toxicity": cfg.toxicity_loss_weight}
 
     steps_per_epoch = sum(len(dl) for dl in loaders.values())
     total = steps_per_epoch * cfg.epochs
-    opt = torch.optim.AdamW(model.parameters(), lr=cfg.learning_rate,
-                            weight_decay=cfg.weight_decay)
+    opt = torch.optim.AdamW(model.parameters(), lr=cfg.learning_rate, weight_decay=cfg.weight_decay)
     sched = get_linear_schedule_with_warmup(opt, int(total * cfg.warmup_ratio), total)
     use_amp = cfg.fp16 and device.type == "cuda"
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
@@ -102,8 +118,9 @@ def train(model: MultiTaskModel, tokenizer, train_data: dict[str, pd.DataFrame],
         for step, task in enumerate(schedule, 1):
             batch = next(iters[task])
             with torch.autocast(device.type, dtype=torch.float16, enabled=use_amp):
-                logits = model(batch["input_ids"].to(device), batch["attention_mask"].to(device),
-                               task=task)[f"{task}_logits"]
+                logits = model(
+                    batch["input_ids"].to(device), batch["attention_mask"].to(device), task=task
+                )[f"{task}_logits"]
             loss = task_weight[task] * loss_fns[task](logits.float(), batch["labels"].to(device))
             opt.zero_grad(set_to_none=True)
             scaler.scale(loss).backward()
@@ -114,15 +131,25 @@ def train(model: MultiTaskModel, tokenizer, train_data: dict[str, pd.DataFrame],
             sched.step()
             running[task].append(loss.item())
             if step % 200 == 0:
-                log.info("epoch %d step %d/%d %s", epoch + 1, step, len(schedule),
-                         {t: round(float(np.mean(v[-200:])), 4) for t, v in running.items() if v})
+                log.info(
+                    "epoch %d step %d/%d %s",
+                    epoch + 1,
+                    step,
+                    len(schedule),
+                    {t: round(float(np.mean(v[-200:])), 4) for t, v in running.items() if v},
+                )
         val = evaluate(model, tokenizer, val_data, cfg, device)
-        rec = {"epoch": epoch + 1,
-               **{f"train_loss_{t}": float(np.mean(v)) for t, v in running.items() if v},
-               **{f"val_{k}": v for k, v in val.items() if isinstance(v, float)}}
+        rec = {
+            "epoch": epoch + 1,
+            **{f"train_loss_{t}": float(np.mean(v)) for t, v in running.items() if v},
+            **{f"val_{k}": v for k, v in val.items() if isinstance(v, float)},
+        }
         history.append(rec)
-        log.info("epoch %d done: %s", epoch + 1,
-                 {k: round(v, 4) for k, v in rec.items() if isinstance(v, float)})
+        log.info(
+            "epoch %d done: %s",
+            epoch + 1,
+            {k: round(v, 4) for k, v in rec.items() if isinstance(v, float)},
+        )
         if on_epoch_end:
             on_epoch_end(rec)
     return {"history": history, "training_seconds": time.time() - t0}

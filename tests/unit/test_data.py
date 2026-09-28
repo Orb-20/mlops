@@ -64,8 +64,14 @@ class TestValidation:
         assert check_no_split_leakage({"a": a, "b": b}) == ["1 texts shared between a and b"]
 
     def test_comment_frame_duplicate_ids(self):
-        df = pd.DataFrame({"source": ["youtube"] * 2, "source_content_id": ["v"] * 2,
-                           "source_comment_id": ["c1", "c1"], "text": ["a", "b"]})
+        df = pd.DataFrame(
+            {
+                "source": ["youtube"] * 2,
+                "source_content_id": ["v"] * 2,
+                "source_comment_id": ["c1", "c1"],
+                "text": ["a", "b"],
+            }
+        )
         assert not validate_comment_frame(df).ok
 
 

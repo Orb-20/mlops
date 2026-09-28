@@ -32,15 +32,20 @@ def reference_texts(n: int | None = None, seed: int | None = None, offset: int =
     for task in ("sentiment", "toxicity"):
         df = pd.read_parquet(d / f"{task}_val.parquet").sample(frac=1.0, random_state=seed)
         k = n // 2
-        parts.append(df["text"].iloc[offset * k:(offset + 1) * k])
+        parts.append(df["text"].iloc[offset * k : (offset + 1) * k])
     return pd.concat(parts).tolist()
 
 
 def window_from_texts(predictor, texts: list[str]) -> WindowData:
     out = predictor.run(texts)
     langs = [r.language for r in detect_many(texts)]
-    return WindowData(out.embeddings, langs, [p.sentiment for p in out.predictions],
-                      [p.toxicity_label for p in out.predictions], list(texts))
+    return WindowData(
+        out.embeddings,
+        langs,
+        [p.sentiment for p in out.predictions],
+        [p.toxicity_label for p in out.predictions],
+        list(texts),
+    )
 
 
 def texts_for_model(predictor) -> list[str]:
@@ -60,15 +65,25 @@ def _path(version: str) -> Path:
 
 def save_window(w: WindowData, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(path, embeddings=w.embeddings.astype(np.float16),
-                        languages=np.array(w.languages), sentiments=np.array(w.sentiments),
-                        toxicity=np.array(w.toxicity_labels), texts=np.array(w.texts))
+    np.savez_compressed(
+        path,
+        embeddings=w.embeddings.astype(np.float16),
+        languages=np.array(w.languages),
+        sentiments=np.array(w.sentiments),
+        toxicity=np.array(w.toxicity_labels),
+        texts=np.array(w.texts),
+    )
 
 
 def load_window_file(path: Path) -> WindowData:
     z = np.load(path, allow_pickle=False)
-    return WindowData(z["embeddings"].astype(np.float32), z["languages"].tolist(),
-                      z["sentiments"].tolist(), z["toxicity"].tolist(), z["texts"].tolist())
+    return WindowData(
+        z["embeddings"].astype(np.float32),
+        z["languages"].tolist(),
+        z["sentiments"].tolist(),
+        z["toxicity"].tolist(),
+        z["texts"].tolist(),
+    )
 
 
 def get_reference(predictor, version: str, rebuild: bool = False) -> WindowData:

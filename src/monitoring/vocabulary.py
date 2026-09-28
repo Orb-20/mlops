@@ -31,15 +31,18 @@ def ngram_counts(texts: list[str], n_max: int = 2) -> Counter:
     return c
 
 
-def vocabulary_report(reference: list[str], current: list[str], top_k: int = 25,
-                      min_count: int = 3) -> dict:
+def vocabulary_report(
+    reference: list[str], current: list[str], top_k: int = 25, min_count: int = 3
+) -> dict:
     ref, cur = ngram_counts(reference), ngram_counts(current)
     ref_total, cur_total = max(sum(ref.values()), 1), max(sum(cur.values()), 1)
     ref_uni = {k for k in ref if " " not in k}
     cur_uni = {k: v for k, v in cur.items() if " " not in k}
 
-    new_terms = sorted(((k, v) for k, v in cur.items() if k not in ref and v >= min_count),
-                       key=lambda kv: (-kv[1], kv[0]))[:top_k]
+    new_terms = sorted(
+        ((k, v) for k, v in cur.items() if k not in ref and v >= min_count),
+        key=lambda kv: (-kv[1], kv[0]),
+    )[:top_k]
     shifts = []
     for k, v in cur.items():
         if v < min_count:
@@ -53,8 +56,9 @@ def vocabulary_report(reference: list[str], current: list[str], top_k: int = 25,
     return {
         "top_current": [{"term": k, "count": v} for k, v in cur.most_common(top_k)],
         "new_terms": [{"term": k, "count": v} for k, v in new_terms],
-        "frequency_shifts": [{"term": k, "count": v, "log2_ratio": round(r, 3)}
-                             for k, v, r in shifts[:top_k]],
+        "frequency_shifts": [
+            {"term": k, "count": v, "log2_ratio": round(r, 3)} for k, v, r in shifts[:top_k]
+        ],
         "oov_rate": round(oov, 4),
         "unigram_jaccard": round(jaccard, 4),
     }

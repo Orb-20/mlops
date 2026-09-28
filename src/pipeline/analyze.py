@@ -58,8 +58,10 @@ def choose_adapter(mode: str):
         return DemoAdapter()
     if mode == "live":
         if not get_env().has_youtube_key:
-            raise MissingAPIKeyError("YOUTUBE_API_KEY is not set; live mode unavailable. "
-                                     "Use demo mode or add the key to .env.")
+            raise MissingAPIKeyError(
+                "YOUTUBE_API_KEY is not set; live mode unavailable. "
+                "Use demo mode or add the key to .env."
+            )
         return YouTubeAdapter()
     return YouTubeAdapter() if get_env().has_youtube_key else DemoAdapter()
 
@@ -69,10 +71,15 @@ def evaluate_drift(predictor, version: str, current: WindowData) -> DriftDecisio
     return DriftDecisionEngine().evaluate(ref, current)
 
 
-def process_comments(comments, content_id: str, mode: str, kind: str, source: str = "youtube",
-                     skipped: int = 0,
-                     extend_window: Callable[[WindowData, str], WindowData] | None = None
-                     ) -> AnalysisOutcome:
+def process_comments(
+    comments,
+    content_id: str,
+    mode: str,
+    kind: str,
+    source: str = "youtube",
+    skipped: int = 0,
+    extend_window: Callable[[WindowData, str], WindowData] | None = None,
+) -> AnalysisOutcome:
     """Run the shared analysis steps on already-fetched comments.
     `extend_window(batch_window, model_version)` lets monitoring prepend stored history."""
     if not comments:
@@ -90,8 +97,12 @@ def process_comments(comments, content_id: str, mode: str, kind: str, source: st
     summary["analysed_at"] = utcnow().isoformat()
 
     current = WindowData(
-        out.embeddings, [r.language for r in langs], [p.sentiment for p in out.predictions],
-        [p.toxicity_label for p in out.predictions], texts)
+        out.embeddings,
+        [r.language for r in langs],
+        [p.sentiment for p in out.predictions],
+        [p.toxicity_label for p in out.predictions],
+        texts,
+    )
     if extend_window is not None:
         current = extend_window(current, info.version)
     log.info("Running drift monitoring (%d samples)", len(current))
@@ -101,32 +112,66 @@ def process_comments(comments, content_id: str, mode: str, kind: str, source: st
 
     with session_scope() as s:
         analysis = repo.save_analysis(
-            s, source=source, content_id=content_id, mode=mode, kind=kind,
-            model_version=info.version, comments=comments, langs=langs,
-            predictions=out.predictions, embeddings=out.embeddings, summary=summary)
-        ev = repo.save_drift_event(s, decision, source=source, content_id=content_id,
-                                   model_version=info.version,
-                                   window_start=min(c.ingested_at for c in comments),
-                                   window_end=max(c.ingested_at for c in comments))
+            s,
+            source=source,
+            content_id=content_id,
+            mode=mode,
+            kind=kind,
+            model_version=info.version,
+            comments=comments,
+            langs=langs,
+            predictions=out.predictions,
+            embeddings=out.embeddings,
+            summary=summary,
+        )
+        ev = repo.save_drift_event(
+            s,
+            decision,
+            source=source,
+            content_id=content_id,
+            model_version=info.version,
+            window_start=min(c.ingested_at for c in comments),
+            window_end=max(c.ingested_at for c in comments),
+        )
         analysis.drift_event_id = ev.id
         s.flush()
         analysis_id, ev_id = analysis.id, ev.id
 
-    return AnalysisOutcome(analysis_id, source, content_id, mode, info.version, summary,
-                           _compact_drift(decision), ev_id, skipped, len(comments))
+    return AnalysisOutcome(
+        analysis_id,
+        source,
+        content_id,
+        mode,
+        info.version,
+        summary,
+        _compact_drift(decision),
+        ev_id,
+        skipped,
+        len(comments),
+    )
 
 
-def analyze_url(url: str | None, mode: str = "auto", max_comments: int | None = None
-                ) -> AnalysisOutcome:
+def analyze_url(
+    url: str | None, mode: str = "auto", max_comments: int | None = None
+) -> AnalysisOutcome:
     init_db()
     max_comments = max_comments or get_config()["ingestion"]["default_max_comments"]
     adapter = choose_adapter(mode)
     content_id = adapter.extract_content_id(url or "")
-    log.info("Fetching comments for %s (%s mode)", content_id,
-             "DEMO" if isinstance(adapter, DemoAdapter) else "LIVE")
+    log.info(
+        "Fetching comments for %s (%s mode)",
+        content_id,
+        "DEMO" if isinstance(adapter, DemoAdapter) else "LIVE",
+    )
     fetched = adapter.fetch_comments(content_id, max_comments=max_comments)
-    return process_comments(fetched.comments, content_id, fetched.mode, "on_demand",
-                            fetched.source, fetched.skipped_malformed)
+    return process_comments(
+        fetched.comments,
+        content_id,
+        fetched.mode,
+        "on_demand",
+        fetched.source,
+        fetched.skipped_malformed,
+    )
 
 
 def _compact_drift(d: DriftDecision) -> dict:
@@ -152,8 +197,17 @@ def main() -> int:
         log.error("%s", exc)
         return 2
     d = res.to_dict()
-    d["drift"] = {k: d["drift"][k] for k in ("overall_status", "drift_detected", "reasons",
-                                             "scores", "thresholds", "sample_count")}
+    d["drift"] = {
+        k: d["drift"][k]
+        for k in (
+            "overall_status",
+            "drift_detected",
+            "reasons",
+            "scores",
+            "thresholds",
+            "sample_count",
+        )
+    }
     d["summary"] = {k: v for k, v in d["summary"].items() if k != "trend"}
     print(json.dumps(d, indent=2, default=str))
     return 0

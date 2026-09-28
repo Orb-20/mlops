@@ -56,8 +56,13 @@ def _mmd2_from_kernel(k: np.ndarray, n: int) -> float:
     return float(sxx + syy - 2 * kxy.mean())
 
 
-def mmd_rbf(reference: np.ndarray, current: np.ndarray, permutations: int = 200,
-            max_samples: int = 500, seed: int = 0) -> tuple[float, float, float]:
+def mmd_rbf(
+    reference: np.ndarray,
+    current: np.ndarray,
+    permutations: int = 200,
+    max_samples: int = 500,
+    seed: int = 0,
+) -> tuple[float, float, float]:
     """Return (mmd2, p_value, bandwidth). Deterministic for a given seed."""
     rng = np.random.default_rng(seed)
     x = _subsample(np.asarray(reference, np.float64), max_samples, rng)
@@ -82,16 +87,25 @@ def mmd_rbf(reference: np.ndarray, current: np.ndarray, permutations: int = 200,
     return observed, p_value, bandwidth
 
 
-def embedding_drift(reference: np.ndarray, current: np.ndarray, cfg: dict,
-                    warning_ratio: float, seed: int = 0) -> SignalResult:
+def embedding_drift(
+    reference: np.ndarray, current: np.ndarray, cfg: dict, warning_ratio: float, seed: int = 0
+) -> SignalResult:
     mmd2, p, bw = mmd_rbf(reference, current, cfg["permutations"], cfg["max_samples"], seed)
     score = max(mmd2, 0.0)
     drifted = score >= cfg["threshold"] and p < cfg["p_value"]
     return SignalResult(
-        "embedding", round(score, 5), cfg["threshold"], drifted,
+        "embedding",
+        round(score, 5),
+        cfg["threshold"],
+        drifted,
         status_for(score, cfg["threshold"], warning_ratio, drifted),
-        {"method": "mmd_rbf", "p_value": round(p, 4), "bandwidth": round(bw, 4),
-         "n_reference": int(len(reference)), "n_current": int(len(current))},
+        {
+            "method": "mmd_rbf",
+            "p_value": round(p, 4),
+            "bandwidth": round(bw, 4),
+            "n_reference": int(len(reference)),
+            "n_current": int(len(current)),
+        },
     )
 
 
@@ -108,15 +122,28 @@ def total_variation(p: dict[str, float], q: dict[str, float]) -> float:
     return 0.5 * sum(abs(p.get(k, 0.0) - q.get(k, 0.0)) for k in keys)
 
 
-def categorical_drift(name: str, reference: dict[str, dict[str, float]],
-                      current: dict[str, dict[str, float]], cfg: dict,
-                      warning_ratio: float) -> SignalResult:
+def categorical_drift(
+    name: str,
+    reference: dict[str, dict[str, float]],
+    current: dict[str, dict[str, float]],
+    cfg: dict,
+    warning_ratio: float,
+) -> SignalResult:
     """reference/current map a sub-signal (e.g. 'sentiment') to a proportion dict.
     Score = max total-variation distance across sub-signals."""
     per = {k: round(total_variation(reference[k], current[k]), 5) for k in reference}
     score = max(per.values()) if per else 0.0
     drifted = score >= cfg["threshold"]
-    return SignalResult(name, round(score, 5), cfg["threshold"], drifted,
-                        status_for(score, cfg["threshold"], warning_ratio, drifted),
-                        {"method": "total_variation", "per_signal": per,
-                         "reference": reference, "current": current})
+    return SignalResult(
+        name,
+        round(score, 5),
+        cfg["threshold"],
+        drifted,
+        status_for(score, cfg["threshold"], warning_ratio, drifted),
+        {
+            "method": "total_variation",
+            "per_signal": per,
+            "reference": reference,
+            "current": current,
+        },
+    )

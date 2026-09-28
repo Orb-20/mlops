@@ -29,7 +29,11 @@ async def lifespan(_: FastAPI):
     worker.stop()
 
 
-app = FastAPI(title="Adaptive NLP MLOps API", version="0.1.0", lifespan=lifespan,
-              description="Sentiment & toxicity monitoring with embedding-drift detection and "
-                          "gated retraining.")
+app = FastAPI(
+    title="Adaptive NLP MLOps API",
+    version="0.1.0",
+    lifespan=lifespan,
+    description="Sentiment & toxicity monitoring with embedding-drift detection and "
+    "gated retraining.",
+)
 app.include_router(router)

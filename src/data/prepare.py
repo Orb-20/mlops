@@ -53,7 +53,8 @@ def download_raw(offline: bool = False) -> dict[str, Path]:
         return files
     for split in ("train", "validation", "test"):
         _hf_download(
-            s["hf_dataset"], f"{s['hf_config']}/{split}-00000-of-00001.parquet",
+            s["hf_dataset"],
+            f"{s['hf_config']}/{split}-00000-of-00001.parquet",
             files[f"sentiment_{split}"],
         )
     t = cfg["toxicity"]
@@ -75,8 +76,11 @@ def build_sentiment(files: dict[str, Path], seed: int) -> dict[str, pd.DataFrame
     out = {}
     seen: set[str] = set()
     # test first, so leakage removal never shrinks the evaluation set
-    for split, key in (("test", "sentiment_test"), ("val", "sentiment_validation"),
-                       ("train", "sentiment_train")):
+    for split, key in (
+        ("test", "sentiment_test"),
+        ("val", "sentiment_validation"),
+        ("train", "sentiment_train"),
+    ):
         df = pd.read_parquet(files[key])[["text", "label"]]
         df = clean_frame(df, min_chars=tcfg["min_chars"], max_chars=tcfg["max_chars"])
         df = df[~df["text"].isin(seen)]
@@ -101,10 +105,12 @@ def build_toxicity(files: dict[str, Path], seed: int) -> dict[str, pd.DataFrame]
         df, train_size=sp["train"], random_state=seed, stratify=df["label"]
     )
     val_frac = sp["val"] / (sp["val"] + sp["test"])
-    val, test = train_test_split(rest, train_size=val_frac, random_state=seed,
-                                 stratify=rest["label"])
-    return {k: v.reset_index(drop=True) for k, v in
-            {"train": train, "val": val, "test": test}.items()}
+    val, test = train_test_split(
+        rest, train_size=val_frac, random_state=seed, stratify=rest["label"]
+    )
+    return {
+        k: v.reset_index(drop=True) for k, v in {"train": train, "val": val, "test": test}.items()
+    }
 
 
 def prepare(offline: bool = False) -> Path:
@@ -141,8 +147,12 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(name)s: %(message)s")
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--offline", action="store_true")
-    ap.add_argument("--step", choices=["download", "build", "all"], default="all",
-                    help="download: fetch raw only; build: raw -> processed (offline)")
+    ap.add_argument(
+        "--step",
+        choices=["download", "build", "all"],
+        default="all",
+        help="download: fetch raw only; build: raw -> processed (offline)",
+    )
     args = ap.parse_args()
     if args.step == "download":
         download_raw()

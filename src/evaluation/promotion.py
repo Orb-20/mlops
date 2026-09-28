@@ -86,20 +86,36 @@ class PromotionDecisionEngine:
             "toxicity_recall": (m["toxicity_recall"], mm["toxicity_recall_min"]),
         }
         failed = [k for k, (v, lo) in checks.items() if v < lo]
-        return GateResult("minimum_metrics", not failed,
-                          {"checks": {k: {"value": round(v, 4), "min": lo}
-                                      for k, (v, lo) in checks.items()}, "failed": failed})
+        return GateResult(
+            "minimum_metrics",
+            not failed,
+            {
+                "checks": {k: {"value": round(v, 4), "min": lo} for k, (v, lo) in checks.items()},
+                "failed": failed,
+            },
+        )
 
     def regression(self, reg: dict) -> GateResult:
-        return GateResult("regression", bool(reg["passed"]), {
-            "failed": reg["failed"], "max_failed_cases": reg["max_failed_cases"],
-            "failed_ids": reg["failed_ids"], "critical_failed_ids": reg["critical_failed_ids"]})
+        return GateResult(
+            "regression",
+            bool(reg["passed"]),
+            {
+                "failed": reg["failed"],
+                "max_failed_cases": reg["max_failed_cases"],
+                "failed_ids": reg["failed_ids"],
+                "critical_failed_ids": reg["critical_failed_ids"],
+            },
+        )
 
-    def production_comparison(self, cand: dict, cand_reg: dict, prod: dict | None,
-                              prod_reg: dict | None) -> GateResult:
+    def production_comparison(
+        self, cand: dict, cand_reg: dict, prod: dict | None, prod_reg: dict | None
+    ) -> GateResult:
         if prod is None:
-            return GateResult("production_comparison", True,
-                              {"note": "no production model yet (bootstrap); comparison skipped"})
+            return GateResult(
+                "production_comparison",
+                True,
+                {"note": "no production model yet (bootstrap); comparison skipped"},
+            )
         pc = self.g["production_comparison"]
         checks = {
             "sentiment_macro_f1": pc["max_sentiment_macro_f1_drop"],
@@ -109,39 +125,63 @@ class PromotionDecisionEngine:
         rows, failed = {}, []
         for k, max_drop in checks.items():
             delta = cand[k] - prod[k]
-            rows[k] = {"candidate": round(cand[k], 4), "production": round(prod[k], 4),
-                       "delta": round(delta, 4), "max_drop": max_drop}
+            rows[k] = {
+                "candidate": round(cand[k], 4),
+                "production": round(prod[k], 4),
+                "delta": round(delta, 4),
+                "max_drop": max_drop,
+            }
             if delta < -max_drop:
                 failed.append(k)
         extra = cand_reg["failed"] - (prod_reg or {"failed": 0})["failed"]
-        rows["regression_failures"] = {"candidate": cand_reg["failed"],
-                                       "production": (prod_reg or {}).get("failed"),
-                                       "max_additional": pc["max_additional_regression_failures"]}
+        rows["regression_failures"] = {
+            "candidate": cand_reg["failed"],
+            "production": (prod_reg or {}).get("failed"),
+            "max_additional": pc["max_additional_regression_failures"],
+        }
         if prod_reg is not None and extra > pc["max_additional_regression_failures"]:
             failed.append("regression_failures")
         return GateResult("production_comparison", not failed, {"checks": rows, "failed": failed})
 
-    def decide(self, candidate_version: str, cand_metrics: dict, cand_reg: dict,
-               artifact: GateResult, production_version: str | None = None,
-               prod_metrics: dict | None = None, prod_reg: dict | None = None
-               ) -> PromotionDecision:
+    def decide(
+        self,
+        candidate_version: str,
+        cand_metrics: dict,
+        cand_reg: dict,
+        artifact: GateResult,
+        production_version: str | None = None,
+        prod_metrics: dict | None = None,
+        prod_reg: dict | None = None,
+    ) -> PromotionDecision:
         gates = [artifact]
         if artifact.passed:
-            gates += [self.minimum_metrics(cand_metrics), self.regression(cand_reg),
-                      self.production_comparison(cand_metrics, cand_reg, prod_metrics, prod_reg)]
+            gates += [
+                self.minimum_metrics(cand_metrics),
+                self.regression(cand_reg),
+                self.production_comparison(cand_metrics, cand_reg, prod_metrics, prod_reg),
+            ]
         failed = [g for g in gates if not g.passed]
         if failed:
             reasons = [f"{g.name}_failed" for g in failed]
-            return PromotionDecision("REJECT", candidate_version, production_version, reasons,
-                                     gates)
-        reasons = ["artifact_valid", "minimum_metrics_passed", "regression_tests_passed",
-                   "no_critical_metric_regression" if prod_metrics is not None
-                   else "bootstrap_no_production_model"]
+            return PromotionDecision(
+                "REJECT", candidate_version, production_version, reasons, gates
+            )
+        reasons = [
+            "artifact_valid",
+            "minimum_metrics_passed",
+            "regression_tests_passed",
+            (
+                "no_critical_metric_regression"
+                if prod_metrics is not None
+                else "bootstrap_no_production_model"
+            ),
+        ]
         return PromotionDecision("PROMOTE", candidate_version, production_version, reasons, gates)
 
 
-def run_promotion(candidate_version: str, extra_test_sets: dict | None = None,
-                  apply: bool = True) -> PromotionDecision:
+def run_promotion(
+    candidate_version: str, extra_test_sets: dict | None = None, apply: bool = True
+) -> PromotionDecision:
     """Evaluate candidate vs production on the SAME labelled data and apply the decision."""
     from src.evaluation.evaluate import default_test_sets, evaluate_predictor
     from src.evaluation.regression import run_suite
@@ -155,8 +195,13 @@ def run_promotion(candidate_version: str, extra_test_sets: dict | None = None,
     prod = registry.get_version_by_alias("production")
     prod_version = str(prod.version) if prod else None
 
-    cand_metrics, cand_reg = {}, {"passed": False, "failed": -1, "max_failed_cases": 0,
-                                  "failed_ids": [], "critical_failed_ids": []}
+    cand_metrics, cand_reg = {}, {
+        "passed": False,
+        "failed": -1,
+        "max_failed_cases": 0,
+        "failed_ids": [],
+        "critical_failed_ids": [],
+    }
     prod_metrics = prod_reg = None
     extra: dict[str, dict] = {}  # informational: e.g. held-out drift test set
     if artifact.passed:
@@ -173,24 +218,32 @@ def run_promotion(candidate_version: str, extra_test_sets: dict | None = None,
             for prefix, sets in (extra_test_sets or {}).items():
                 extra.setdefault(prefix, {})["production"] = evaluate_predictor(pp, sets)
             del pp
-    decision = engine.decide(candidate_version, cand_metrics, cand_reg, artifact,
-                             prod_version, prod_metrics, prod_reg)
-    log.info("Promotion decision for v%s: %s %s", candidate_version, decision.decision,
-             decision.reasons)
+    decision = engine.decide(
+        candidate_version, cand_metrics, cand_reg, artifact, prod_version, prod_metrics, prod_reg
+    )
+    log.info(
+        "Promotion decision for v%s: %s %s", candidate_version, decision.decision, decision.reasons
+    )
     if apply:
         if decision.decision == "PROMOTE":
             registry.promote_to_production(candidate_version)
-            log.info("Candidate v%s promoted to production (previous: %s)", candidate_version,
-                     prod_version)
+            log.info(
+                "Candidate v%s promoted to production (previous: %s)",
+                candidate_version,
+                prod_version,
+            )
         else:
             registry.reject(candidate_version, ", ".join(decision.reasons))
-            log.warning("Candidate v%s rejected; production remains %s", candidate_version,
-                        prod_version)
+            log.warning(
+                "Candidate v%s rejected; production remains %s", candidate_version, prod_version
+            )
     decision._evidence = {  # type: ignore[attr-defined]
-        "candidate_metrics": cand_metrics, "production_metrics": prod_metrics,
+        "candidate_metrics": cand_metrics,
+        "production_metrics": prod_metrics,
         "candidate_regression": {k: v for k, v in cand_reg.items() if k != "cases"},
-        "production_regression": ({k: v for k, v in prod_reg.items() if k != "cases"}
-                                  if prod_reg else None),
+        "production_regression": (
+            {k: v for k, v in prod_reg.items() if k != "cases"} if prod_reg else None
+        ),
         "extra_evaluations": extra,
     }
     return decision

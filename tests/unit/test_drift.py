@@ -12,9 +12,17 @@ from src.monitoring.drift import (
 from src.monitoring.vocabulary import vocabulary_report
 
 CFG = {
-    "minimum_samples": 50, "warning_ratio": 0.7, "overall_threshold": 0.5,
-    "embedding": {"enabled": True, "threshold": 0.05, "p_value": 0.05, "permutations": 100,
-                  "max_samples": 200, "weight": 0.7},
+    "minimum_samples": 50,
+    "warning_ratio": 0.7,
+    "overall_threshold": 0.5,
+    "embedding": {
+        "enabled": True,
+        "threshold": 0.05,
+        "p_value": 0.05,
+        "permutations": 100,
+        "max_samples": 200,
+        "weight": 0.7,
+    },
     "language": {"enabled": True, "threshold": 0.1, "weight": 0.15},
     "prediction": {"enabled": True, "threshold": 0.1, "weight": 0.15},
     "vocabulary": {"enabled": True, "top_k": 10, "min_count": 2},
@@ -59,10 +67,13 @@ def test_total_variation():
 
 
 def test_categorical_drift_takes_max_subsignal():
-    r = categorical_drift("prediction",
-                          {"s": {"x": 1.0, "y": 0.0}, "t": {"x": 0.5, "y": 0.5}},
-                          {"s": {"x": 1.0, "y": 0.0}, "t": {"x": 0.3, "y": 0.7}},
-                          {"threshold": 0.1}, 0.7)
+    r = categorical_drift(
+        "prediction",
+        {"s": {"x": 1.0, "y": 0.0}, "t": {"x": 0.5, "y": 0.5}},
+        {"s": {"x": 1.0, "y": 0.0}, "t": {"x": 0.3, "y": 0.7}},
+        {"threshold": 0.1},
+        0.7,
+    )
     assert r.score == 0.2 and r.drifted
 
 
@@ -73,19 +84,20 @@ def _window(emb, lang="en", sent="positive", tox="safe", texts=None):
 
 class TestDecisionEngine:
     def test_insufficient_samples_never_triggers(self):
-        d = DriftDecisionEngine(CFG, seed=0).evaluate(_window(gauss(100)),
-                                                     _window(gauss(10, 3.0)))
+        d = DriftDecisionEngine(CFG, seed=0).evaluate(_window(gauss(100)), _window(gauss(10, 3.0)))
         assert d.overall_status == "insufficient_data"
         assert not d.drift_detected and not d.retraining_recommended
 
     def test_stable(self):
-        d = DriftDecisionEngine(CFG, seed=0).evaluate(_window(gauss(150, seed=1)),
-                                                     _window(gauss(150, seed=2)))
+        d = DriftDecisionEngine(CFG, seed=0).evaluate(
+            _window(gauss(150, seed=1)), _window(gauss(150, seed=2))
+        )
         assert d.overall_status == "stable" and not d.drift_detected and d.reasons == []
 
     def test_embedding_drift_alone_triggers(self):
-        d = DriftDecisionEngine(CFG, seed=0).evaluate(_window(gauss(150, seed=1)),
-                                                     _window(gauss(150, 1.0, seed=2)))
+        d = DriftDecisionEngine(CFG, seed=0).evaluate(
+            _window(gauss(150, seed=1)), _window(gauss(150, 1.0, seed=2))
+        )
         assert d.drift_detected and d.reasons == ["embedding_drift"]
         assert d.severity == "medium" and d.retraining_recommended
 
@@ -102,8 +114,14 @@ class TestDecisionEngine:
         cur = _window(gauss(150, 1.0, seed=2), lang="hinglish", sent="negative")
         d = DriftDecisionEngine(CFG, seed=0).evaluate(ref, cur)
         assert d.drift_detected and d.severity == "high" and len(d.reasons) == 3
-        assert set(d.to_dict()) >= {"drift_detected", "severity", "reasons", "scores",
-                                    "thresholds", "sample_count"}
+        assert set(d.to_dict()) >= {
+            "drift_detected",
+            "severity",
+            "reasons",
+            "scores",
+            "thresholds",
+            "sample_count",
+        }
 
 
 def test_vocabulary_report_new_terms():

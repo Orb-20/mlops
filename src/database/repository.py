@@ -24,28 +24,45 @@ from src.nlp.language import LanguageResult
 
 
 def known_comment_ids(s: Session, source: str, content_id: str) -> set[str]:
-    rows = s.scalars(select(Comment.source_comment_id).where(
-        Comment.source == source, Comment.source_content_id == content_id))
+    rows = s.scalars(
+        select(Comment.source_comment_id).where(
+            Comment.source == source, Comment.source_content_id == content_id
+        )
+    )
     return set(rows)
 
 
-def upsert_comments(s: Session, comments: list[CommentRecord], langs: list[LanguageResult],
-                    mode: str) -> list[Comment]:
+def upsert_comments(
+    s: Session, comments: list[CommentRecord], langs: list[LanguageResult], mode: str
+) -> list[Comment]:
     """Insert new comments; return ORM rows (existing rows reused) in input order."""
     if not comments:
         return []
     ids = [c.source_comment_id for c in comments]
-    existing = {c.source_comment_id: c for c in s.scalars(select(Comment).where(
-        Comment.source == comments[0].source, Comment.source_comment_id.in_(ids)))}
+    existing = {
+        c.source_comment_id: c
+        for c in s.scalars(
+            select(Comment).where(
+                Comment.source == comments[0].source, Comment.source_comment_id.in_(ids)
+            )
+        )
+    }
     out = []
     for c, lang in zip(comments, langs, strict=True):
         row = existing.get(c.source_comment_id)
         if row is None:
-            row = Comment(source=c.source, source_content_id=c.source_content_id,
-                          source_comment_id=c.source_comment_id,
-                          parent_comment_id=c.parent_comment_id, mode=mode, text=c.text,
-                          timestamp=c.timestamp, ingested_at=c.ingested_at,
-                          language=lang.language, language_confidence=lang.confidence)
+            row = Comment(
+                source=c.source,
+                source_content_id=c.source_content_id,
+                source_comment_id=c.source_comment_id,
+                parent_comment_id=c.parent_comment_id,
+                mode=mode,
+                text=c.text,
+                timestamp=c.timestamp,
+                ingested_at=c.ingested_at,
+                language=lang.language,
+                language_confidence=lang.confidence,
+            )
             s.add(row)
             existing[c.source_comment_id] = row
         out.append(row)
@@ -53,42 +70,84 @@ def upsert_comments(s: Session, comments: list[CommentRecord], langs: list[Langu
     return out
 
 
-def save_analysis(s: Session, *, source: str, content_id: str, mode: str, kind: str,
-                  model_version: str, comments: list[CommentRecord],
-                  langs: list[LanguageResult], predictions: list[Prediction],
-                  embeddings: np.ndarray, summary: dict) -> Analysis:
-    analysis = Analysis(source=source, content_id=content_id, mode=mode, kind=kind,
-                        model_version=model_version, comment_count=len(comments),
-                        summary=summary)
+def save_analysis(
+    s: Session,
+    *,
+    source: str,
+    content_id: str,
+    mode: str,
+    kind: str,
+    model_version: str,
+    comments: list[CommentRecord],
+    langs: list[LanguageResult],
+    predictions: list[Prediction],
+    embeddings: np.ndarray,
+    summary: dict,
+) -> Analysis:
+    analysis = Analysis(
+        source=source,
+        content_id=content_id,
+        mode=mode,
+        kind=kind,
+        model_version=model_version,
+        comment_count=len(comments),
+        summary=summary,
+    )
     s.add(analysis)
     s.flush()
     rows = upsert_comments(s, comments, langs, mode)
-    have_emb = set(s.scalars(select(EmbeddingRow.comment_id).where(
-        EmbeddingRow.model_version == model_version,
-        EmbeddingRow.comment_id.in_([r.id for r in rows]))))
+    have_emb = set(
+        s.scalars(
+            select(EmbeddingRow.comment_id).where(
+                EmbeddingRow.model_version == model_version,
+                EmbeddingRow.comment_id.in_([r.id for r in rows]),
+            )
+        )
+    )
     for row, p, e in zip(rows, predictions, embeddings, strict=True):
-        s.add(PredictionRow(comment_id=row.id, analysis_id=analysis.id,
-                            model_version=model_version, sentiment=p.sentiment,
-                            sentiment_confidence=p.sentiment_confidence,
-                            toxicity_score=p.toxicity_score, toxicity_label=p.toxicity_label))
+        s.add(
+            PredictionRow(
+                comment_id=row.id,
+                analysis_id=analysis.id,
+                model_version=model_version,
+                sentiment=p.sentiment,
+                sentiment_confidence=p.sentiment_confidence,
+                toxicity_score=p.toxicity_score,
+                toxicity_label=p.toxicity_label,
+            )
+        )
         if row.id not in have_emb:
-            s.add(EmbeddingRow(comment_id=row.id, model_version=model_version,
-                               vector=to_bytes(e), dim=int(e.shape[0])))
+            s.add(
+                EmbeddingRow(
+                    comment_id=row.id,
+                    model_version=model_version,
+                    vector=to_bytes(e),
+                    dim=int(e.shape[0]),
+                )
+            )
             have_emb.add(row.id)
     s.flush()
     return analysis
 
 
-def load_window(s: Session, source: str, content_id: str, model_version: str,
-                limit: int) -> tuple[WindowData, datetime | None, datetime | None]:
+def load_window(
+    s: Session, source: str, content_id: str, model_version: str, limit: int
+) -> tuple[WindowData, datetime | None, datetime | None]:
     """Most recent `limit` comments of a content item that have embeddings for this model."""
-    q = (select(Comment, EmbeddingRow, PredictionRow)
-         .join(EmbeddingRow, (EmbeddingRow.comment_id == Comment.id)
-               & (EmbeddingRow.model_version == model_version))
-         .join(PredictionRow, (PredictionRow.comment_id == Comment.id)
-               & (PredictionRow.model_version == model_version))
-         .where(Comment.source == source, Comment.source_content_id == content_id)
-         .order_by(desc(Comment.ingested_at), desc(Comment.id)))
+    q = (
+        select(Comment, EmbeddingRow, PredictionRow)
+        .join(
+            EmbeddingRow,
+            (EmbeddingRow.comment_id == Comment.id) & (EmbeddingRow.model_version == model_version),
+        )
+        .join(
+            PredictionRow,
+            (PredictionRow.comment_id == Comment.id)
+            & (PredictionRow.model_version == model_version),
+        )
+        .where(Comment.source == source, Comment.source_content_id == content_id)
+        .order_by(desc(Comment.ingested_at), desc(Comment.id))
+    )
     seen, rows = set(), []
     for c, e, p in s.execute(q):
         if c.id in seen:
@@ -101,24 +160,43 @@ def load_window(s: Session, source: str, content_id: str, model_version: str,
     if not rows:
         return WindowData(np.zeros((0, 1), np.float32), [], [], [], []), None, None
     emb = np.stack([from_bytes(e.vector) for _, e, _ in rows])
-    w = WindowData(emb, [c.language for c, _, _ in rows], [p.sentiment for _, _, p in rows],
-                   [p.toxicity_label for _, _, p in rows], [c.text for c, _, _ in rows])
+    w = WindowData(
+        emb,
+        [c.language for c, _, _ in rows],
+        [p.sentiment for _, _, p in rows],
+        [p.toxicity_label for _, _, p in rows],
+        [c.text for c, _, _ in rows],
+    )
     stamps = [c.ingested_at for c, _, _ in rows]
     return w, min(stamps), max(stamps)
 
 
-def save_drift_event(s: Session, decision: DriftDecision, *, source: str, content_id: str,
-                     model_version: str, window_start=None, window_end=None) -> DriftEvent:
+def save_drift_event(
+    s: Session,
+    decision: DriftDecision,
+    *,
+    source: str,
+    content_id: str,
+    model_version: str,
+    window_start=None,
+    window_end=None,
+) -> DriftEvent:
     ev = DriftEvent(
-        source=source, content_id=content_id, model_version=model_version,
-        window_start=window_start, window_end=window_end,
+        source=source,
+        content_id=content_id,
+        model_version=model_version,
+        window_start=window_start,
+        window_end=window_end,
         embedding_score=decision.scores.get("embedding"),
         language_score=decision.scores.get("language"),
         prediction_score=decision.scores.get("prediction"),
         vocabulary_oov_rate=(decision.vocabulary or {}).get("oov_rate"),
-        sample_count=decision.sample_count, drift_detected=decision.drift_detected,
-        severity=decision.severity, overall_status=decision.overall_status,
-        reason=", ".join(decision.reasons) or "none", details=_jsonable(decision.to_dict()),
+        sample_count=decision.sample_count,
+        drift_detected=decision.drift_detected,
+        severity=decision.severity,
+        overall_status=decision.overall_status,
+        reason=", ".join(decision.reasons) or "none",
+        details=_jsonable(decision.to_dict()),
         retraining_status="pending" if decision.retraining_recommended else "none",
     )
     s.add(ev)
@@ -145,8 +223,13 @@ def drift_history(s: Session, limit: int = 100) -> list[DriftEvent]:
 
 
 def pending_drift_events(s: Session) -> list[DriftEvent]:
-    return list(s.scalars(select(DriftEvent).where(DriftEvent.retraining_status == "pending")
-                          .order_by(DriftEvent.id)))
+    return list(
+        s.scalars(
+            select(DriftEvent)
+            .where(DriftEvent.retraining_status == "pending")
+            .order_by(DriftEvent.id)
+        )
+    )
 
 
 def model_events(s: Session, limit: int = 100) -> list[ModelEvent]:
@@ -161,12 +244,14 @@ def recent_analyses(s: Session, limit: int = 20) -> list[Analysis]:
     return list(s.scalars(select(Analysis).order_by(desc(Analysis.id)).limit(limit)))
 
 
-def upsert_monitor(s: Session, content_id: str, mode: str, interval: int,
-                   active: bool = True) -> MonitoredVideo:
+def upsert_monitor(
+    s: Session, content_id: str, mode: str, interval: int, active: bool = True
+) -> MonitoredVideo:
     m = s.scalars(select(MonitoredVideo).where(MonitoredVideo.content_id == content_id)).first()
     if m is None:
-        m = MonitoredVideo(content_id=content_id, mode=mode, poll_interval_seconds=interval,
-                           active=active)
+        m = MonitoredVideo(
+            content_id=content_id, mode=mode, poll_interval_seconds=interval, active=active
+        )
         s.add(m)
     else:
         m.active, m.mode, m.poll_interval_seconds = active, mode, interval

@@ -19,8 +19,12 @@ def _dist(values: list[str], labels) -> dict[str, float]:
     return {lbl: round(c.get(lbl, 0) / n, 4) if n else 0.0 for lbl in labels}
 
 
-def compute_summary(comments: list[CommentRecord], langs: list[LanguageResult],
-                    preds: list[Prediction], n_buckets: int = 10) -> dict:
+def compute_summary(
+    comments: list[CommentRecord],
+    langs: list[LanguageResult],
+    preds: list[Prediction],
+    n_buckets: int = 10,
+) -> dict:
     n = len(preds)
     sentiments = [p.sentiment for p in preds]
     tox = [p.toxicity_label for p in preds]
@@ -28,8 +32,9 @@ def compute_summary(comments: list[CommentRecord], langs: list[LanguageResult],
     summary = {
         "comment_count": n,
         "sentiment": _dist(sentiments, SENTIMENT_LABELS),
-        "sentiment_avg_confidence": round(sum(p.sentiment_confidence for p in preds) / n, 4)
-        if n else 0.0,
+        "sentiment_avg_confidence": (
+            round(sum(p.sentiment_confidence for p in preds) / n, 4) if n else 0.0
+        ),
         "toxicity": _dist(tox, ("safe", "toxic")),
         "toxicity_avg_score": round(sum(scores) / n, 4) if n else 0.0,
         "high_risk_count": sum(s >= HIGH_RISK_TOXICITY for s in scores),
@@ -46,12 +51,14 @@ def _trend(comments: list[CommentRecord], preds: list[Prediction], n_buckets: in
     """Sentiment/toxicity by chronological bucket (timestamp if available, else arrival order)."""
     if not preds:
         return []
-    df = pd.DataFrame({
-        "ts": [c.timestamp for c in comments],
-        "sent": [p.sentiment for p in preds],
-        "tox": [p.toxicity_score for p in preds],
-        "toxic": [p.toxicity_label == "toxic" for p in preds],
-    })
+    df = pd.DataFrame(
+        {
+            "ts": [c.timestamp for c in comments],
+            "sent": [p.sentiment for p in preds],
+            "tox": [p.toxicity_score for p in preds],
+            "toxic": [p.toxicity_label == "toxic" for p in preds],
+        }
+    )
     has_ts = df["ts"].notna().all()
     if has_ts:
         df = df.sort_values("ts", kind="stable").reset_index(drop=True)
@@ -59,22 +66,29 @@ def _trend(comments: list[CommentRecord], preds: list[Prediction], n_buckets: in
     df["bucket"] = pd.qcut(df.index, k, labels=False) if k > 1 else 0
     out = []
     for b, g in df.groupby("bucket"):
-        out.append({
-            "bucket": int(b),
-            "start": g["ts"].min().isoformat() if has_ts else None,
-            "end": g["ts"].max().isoformat() if has_ts else None,
-            "n": int(len(g)),
-            "positive": round(float((g["sent"] == "positive").mean()), 4),
-            "neutral": round(float((g["sent"] == "neutral").mean()), 4),
-            "negative": round(float((g["sent"] == "negative").mean()), 4),
-            "toxic_rate": round(float(g["toxic"].mean()), 4),
-            "avg_toxicity": round(float(g["tox"].mean()), 4),
-        })
+        out.append(
+            {
+                "bucket": int(b),
+                "start": g["ts"].min().isoformat() if has_ts else None,
+                "end": g["ts"].max().isoformat() if has_ts else None,
+                "n": int(len(g)),
+                "positive": round(float((g["sent"] == "positive").mean()), 4),
+                "neutral": round(float((g["sent"] == "neutral").mean()), 4),
+                "negative": round(float((g["sent"] == "negative").mean()), 4),
+                "toxic_rate": round(float(g["toxic"].mean()), 4),
+                "avg_toxicity": round(float(g["tox"].mean()), 4),
+            }
+        )
     return out
 
 
-LANG_NAMES = {"en": "English", "hi": "Hindi", "hinglish": "Hinglish", "es": "Spanish",
-              "other": "Other"}
+LANG_NAMES = {
+    "en": "English",
+    "hi": "Hindi",
+    "hinglish": "Hinglish",
+    "es": "Spanish",
+    "other": "Other",
+}
 
 
 def executive_summary(s: dict) -> str:
@@ -88,8 +102,11 @@ def executive_summary(s: dict) -> str:
     else:
         second = sorted(sent.items(), key=lambda kv: -kv[1])[1][0]
         tone = f"mixed (mostly {top}, then {second})"
-    langs = [LANG_NAMES.get(k, k) for k, v in sorted(s["languages"].items(),
-                                                     key=lambda kv: -kv[1]) if v > 0]
+    langs = [
+        LANG_NAMES.get(k, k)
+        for k, v in sorted(s["languages"].items(), key=lambda kv: -kv[1])
+        if v > 0
+    ]
     return (
         f"The model predicts the audience reaction is {tone}: "
         f"{sent['positive']:.0%} positive, {sent['neutral']:.0%} neutral, "

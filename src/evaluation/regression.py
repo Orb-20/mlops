@@ -44,8 +44,10 @@ def validate_cases(df: pd.DataFrame) -> list[str]:
     if df["id"].duplicated().any():
         problems.append("duplicate ids")
     for row in df.itertuples():
-        for col, allowed in (("expected_sentiment", SENTIMENT_LABELS),
-                             ("expected_toxicity", TOXICITY_LABELS)):
+        for col, allowed in (
+            ("expected_sentiment", SENTIMENT_LABELS),
+            ("expected_toxicity", TOXICITY_LABELS),
+        ):
             bad = set(getattr(row, col).split("|")) - set(allowed)
             if bad:
                 problems.append(f"{row.id}: invalid {col} {sorted(bad)}")
@@ -88,17 +90,32 @@ def run_suite(predictor, df: pd.DataFrame | None = None) -> RegressionResult:
         cat = by_cat.setdefault(row.category, {"total": 0, "failed": 0})
         cat["total"] += 1
         cat["failed"] += int(not ok)
-        cases.append({"id": row.id, "text": row.text, "category": row.category,
-                      "expected_sentiment": row.expected_sentiment,
-                      "predicted_sentiment": p.sentiment,
-                      "expected_toxicity": row.expected_toxicity,
-                      "predicted_toxicity": p.toxicity_label,
-                      "toxicity_score": p.toxicity_score, "passed": ok,
-                      "critical": row.id in critical})
+        cases.append(
+            {
+                "id": row.id,
+                "text": row.text,
+                "category": row.category,
+                "expected_sentiment": row.expected_sentiment,
+                "predicted_sentiment": p.sentiment,
+                "expected_toxicity": row.expected_toxicity,
+                "predicted_toxicity": p.toxicity_label,
+                "toxicity_score": p.toxicity_score,
+                "passed": ok,
+                "critical": row.id in critical,
+            }
+        )
     crit_failed = [i for i in failed_ids if i in critical]
     passed = len(failed_ids) <= gcfg["max_failed_cases"] and not crit_failed
-    return RegressionResult(len(df), len(failed_ids), failed_ids, crit_failed,
-                            gcfg["max_failed_cases"], passed, by_cat, cases)
+    return RegressionResult(
+        len(df),
+        len(failed_ids),
+        failed_ids,
+        crit_failed,
+        gcfg["max_failed_cases"],
+        passed,
+        by_cat,
+        cases,
+    )
 
 
 def main() -> int:

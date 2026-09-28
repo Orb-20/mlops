@@ -44,12 +44,20 @@ class ModelService:
         except Exception as exc:  # noqa: BLE001
             raise ModelUnavailable(f"MLflow registry unavailable: {exc}") from exc
         if mv is None:
-            raise ModelUnavailable("No production model registered. Run "
-                                   "`python -m src.training.train` then "
-                                   "`python -m src.evaluation.promotion --alias candidate`.")
+            raise ModelUnavailable(
+                "No production model registered. Run "
+                "`python -m src.training.train` then "
+                "`python -m src.evaluation.promotion --alias candidate`."
+            )
         t = mv.tags
-        return ModelInfo(str(mv.version), mv.run_id, t.get("dataset_version"),
-                         t.get("git_commit"), mv.creation_timestamp, t.get("lifecycle"))
+        return ModelInfo(
+            str(mv.version),
+            mv.run_id,
+            t.get("dataset_version"),
+            t.get("git_commit"),
+            mv.creation_timestamp,
+            t.get("lifecycle"),
+        )
 
     def get(self) -> tuple[Predictor, ModelInfo]:
         with self._lock:

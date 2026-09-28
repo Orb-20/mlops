@@ -23,8 +23,9 @@ def default_test_sets() -> dict[str, pd.DataFrame]:
     return {t: pd.read_parquet(d / f"{t}_test.parquet") for t in ("sentiment", "toxicity")}
 
 
-def evaluate_predictor(predictor: Predictor, test_sets: dict[str, pd.DataFrame],
-                       prefix: str = "") -> dict:
+def evaluate_predictor(
+    predictor: Predictor, test_sets: dict[str, pd.DataFrame], prefix: str = ""
+) -> dict:
     # each model is evaluated at its own decision threshold (calibrated on validation data,
     # or the configured default for models without one)
     thr = getattr(predictor, "threshold", get_config()["inference"]["toxicity_threshold"])
@@ -40,7 +41,8 @@ def evaluate_predictor(predictor: Predictor, test_sets: dict[str, pd.DataFrame],
     return {f"{prefix}{k}": v for k, v in out.items()}
 
 
-def evaluate_model_dir(model_dir: Path, test_sets: dict[str, pd.DataFrame] | None = None,
-                       version: str = "local") -> dict:
+def evaluate_model_dir(
+    model_dir: Path, test_sets: dict[str, pd.DataFrame] | None = None, version: str = "local"
+) -> dict:
     predictor = Predictor(model_dir, version=version)
     return evaluate_predictor(predictor, test_sets or default_test_sets())

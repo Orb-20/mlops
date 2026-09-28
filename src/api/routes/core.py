@@ -40,8 +40,13 @@ from src.training import registry
 
 router = APIRouter()
 
-_INGESTION_STATUS = {InvalidURLError: 422, MissingAPIKeyError: 400, QuotaExceededError: 429,
-                     CommentsDisabledError: 409, ContentNotFoundError: 404}
+_INGESTION_STATUS = {
+    InvalidURLError: 422,
+    MissingAPIKeyError: 400,
+    QuotaExceededError: 429,
+    CommentsDisabledError: 409,
+    ContentNotFoundError: 404,
+}
 
 
 def _ingestion_http(exc: IngestionError) -> HTTPException:
@@ -62,10 +67,14 @@ def health() -> HealthResponse:
     except Exception:  # noqa: BLE001
         mlflow_ok = False
     env = get_env()
-    return HealthResponse(status="ok" if db and mlflow_ok and prod else "degraded", database=db,
-                          mlflow=mlflow_ok, production_model=prod,
-                          youtube_api_configured=env.has_youtube_key,
-                          environment=env.environment)
+    return HealthResponse(
+        status="ok" if db and mlflow_ok and prod else "degraded",
+        database=db,
+        mlflow=mlflow_ok,
+        production_model=prod,
+        youtube_api_configured=env.has_youtube_key,
+        environment=env.environment,
+    )
 
 
 @router.get("/api/v1/model", response_model=ModelResponse, tags=["model"])
@@ -75,11 +84,15 @@ def model_info() -> ModelResponse:
     except ModelUnavailable as exc:
         raise HTTPException(503, str(exc)) from exc
     return ModelResponse(
-        registered_model=registry.registered_name(), version=info.version,
-        status=info.lifecycle or "production", run_id=info.run_id,
-        dataset_version=info.dataset_version, git_commit=info.git_commit,
+        registered_model=registry.registered_name(),
+        version=info.version,
+        status=info.lifecycle or "production",
+        run_id=info.run_id,
+        dataset_version=info.dataset_version,
+        git_commit=info.git_commit,
         created=datetime.fromtimestamp(info.created / 1000, UTC) if info.created else None,
-        versions=registry.list_versions())
+        versions=registry.list_versions(),
+    )
 
 
 @router.post("/api/v1/analyze/youtube", response_model=AnalyzeResponse, tags=["analysis"])
@@ -96,15 +109,30 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
         raise HTTPException(503, str(exc)) from exc
     s, d = res.summary, res.drift
     return AnalyzeResponse(
-        analysis_id=res.analysis_id, source=res.source, content_id=res.content_id,
-        data_mode=res.mode, data_label="LIVE YOUTUBE DATA" if res.mode == "live" else "DEMO DATA",
-        comment_count=s["comment_count"], model_version=res.model_version,
-        sentiment=s["sentiment"], toxicity=s["toxicity"], languages=s["languages"], summary=s,
-        drift=DriftSummary(status=d["overall_status"], drift_detected=d["drift_detected"],
-                           severity=d["severity"], reasons=d["reasons"], scores=d["scores"],
-                           thresholds=d["thresholds"], sample_count=d["sample_count"],
-                           event_id=res.drift_event_id, vocabulary=d.get("vocabulary")),
-        report_url=f"/api/v1/report/{res.analysis_id}")
+        analysis_id=res.analysis_id,
+        source=res.source,
+        content_id=res.content_id,
+        data_mode=res.mode,
+        data_label="LIVE YOUTUBE DATA" if res.mode == "live" else "DEMO DATA",
+        comment_count=s["comment_count"],
+        model_version=res.model_version,
+        sentiment=s["sentiment"],
+        toxicity=s["toxicity"],
+        languages=s["languages"],
+        summary=s,
+        drift=DriftSummary(
+            status=d["overall_status"],
+            drift_detected=d["drift_detected"],
+            severity=d["severity"],
+            reasons=d["reasons"],
+            scores=d["scores"],
+            thresholds=d["thresholds"],
+            sample_count=d["sample_count"],
+            event_id=res.drift_event_id,
+            vocabulary=d.get("vocabulary"),
+        ),
+        report_url=f"/api/v1/report/{res.analysis_id}",
+    )
 
 
 # ------------------------------------------------------------------------------ monitoring
@@ -143,9 +171,14 @@ def monitor_status() -> MonitorStatus:
 
 
 def _monitor_item(m) -> MonitorItem:
-    return MonitorItem(content_id=m.content_id, mode=m.mode, active=m.active,
-                       poll_interval_seconds=m.poll_interval_seconds,
-                       last_polled_at=m.last_polled_at, last_status=m.last_status)
+    return MonitorItem(
+        content_id=m.content_id,
+        mode=m.mode,
+        active=m.active,
+        poll_interval_seconds=m.poll_interval_seconds,
+        last_polled_at=m.last_polled_at,
+        last_status=m.last_status,
+    )
 
 
 # ------------------------------------------------------------------------------ drift / retraining
@@ -177,8 +210,10 @@ def drift_history(limit: int = Query(100, ge=1, le=1000)):
 @router.get("/api/v1/retraining/history", response_model=list[ModelEventOut], tags=["retraining"])
 def retraining_history(limit: int = Query(100, ge=1, le=1000)):
     with session_scope() as s:
-        return [ModelEventOut.model_validate(e, from_attributes=True)
-                for e in repo.model_events(s, limit)]
+        return [
+            ModelEventOut.model_validate(e, from_attributes=True)
+            for e in repo.model_events(s, limit)
+        ]
 
 
 @router.get("/api/v1/report/{analysis_id}", tags=["report"])
@@ -195,10 +230,19 @@ def report(analysis_id: int, format: str = Query("html", pattern="^(html|md)$"))
 @router.get("/api/v1/analyses", tags=["analysis"])
 def analyses(limit: int = Query(20, ge=1, le=200)):
     with session_scope() as s:
-        return [{"id": a.id, "content_id": a.content_id, "mode": a.mode, "kind": a.kind,
-                 "model_version": a.model_version, "comment_count": a.comment_count,
-                 "created_at": a.created_at, "drift_event_id": a.drift_event_id}
-                for a in repo.recent_analyses(s, limit)]
+        return [
+            {
+                "id": a.id,
+                "content_id": a.content_id,
+                "mode": a.mode,
+                "kind": a.kind,
+                "model_version": a.model_version,
+                "comment_count": a.comment_count,
+                "created_at": a.created_at,
+                "drift_event_id": a.drift_event_id,
+            }
+            for a in repo.recent_analyses(s, limit)
+        ]
 
 
 @router.get("/api/v1/analyses/{analysis_id}", tags=["analysis"])
@@ -214,10 +258,18 @@ def analysis_detail(analysis_id: int):
         drift = (ev.details or {}) if ev else {}
         for sig in drift.get("signals", {}).values():
             sig.get("details", {}).pop("reference", None)
-        return {"analysis_id": a.id, "source": a.source, "content_id": a.content_id,
-                "data_mode": a.mode, "kind": a.kind, "model_version": a.model_version,
-                "comment_count": a.comment_count, "created_at": a.created_at,
-                "summary": a.summary, "drift": drift,
-                "drift_event_id": a.drift_event_id,
-                "retraining_status": ev.retraining_status if ev else None,
-                "report_url": f"/api/v1/report/{a.id}"}
+        return {
+            "analysis_id": a.id,
+            "source": a.source,
+            "content_id": a.content_id,
+            "data_mode": a.mode,
+            "kind": a.kind,
+            "model_version": a.model_version,
+            "comment_count": a.comment_count,
+            "created_at": a.created_at,
+            "summary": a.summary,
+            "drift": drift,
+            "drift_event_id": a.drift_event_id,
+            "retraining_status": ev.retraining_status if ev else None,
+            "report_url": f"/api/v1/report/{a.id}",
+        }
