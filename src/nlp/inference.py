@@ -37,7 +37,9 @@ class Predictor:
         cfg = get_config()
         self.max_length = self.metadata.get("max_length", cfg["model"]["max_length"])
         self.batch_size = cfg["inference"]["batch_size"]
-        self.threshold = cfg["inference"]["toxicity_threshold"]
+        # per-model calibrated threshold (validation-chosen) if the artifact has one
+        self.threshold = float(self.metadata.get("toxicity_threshold",
+                                                 cfg["inference"]["toxicity_threshold"]))
         self.sent_labels = self.metadata["sentiment_labels"]
         self.tox_labels = self.metadata["toxicity_labels"]
         log.info("Loaded model %s from %s on %s", version, model_dir, self.device)

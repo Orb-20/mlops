@@ -52,6 +52,20 @@ def toxicity_metrics(y_true, y_score, threshold: float = 0.5) -> dict:
     return out
 
 
+def calibrate_threshold(y_true, y_score, lo: float = 0.05, hi: float = 0.95,
+                        step: float = 0.01) -> float:
+    """F1-optimal decision threshold on a VALIDATION set (never the test set).
+    Ties resolve to the threshold closest to 0.5."""
+    y_true, y_score = np.asarray(y_true), np.asarray(y_score, dtype=float)
+    best_t, best_f1 = 0.5, -1.0
+    for t in np.arange(lo, hi + 1e-9, step):
+        f1 = f1_score(y_true, (y_score >= t).astype(int), zero_division=0)
+        tie = abs(f1 - best_f1) <= 1e-12 and abs(t - 0.5) < abs(best_t - 0.5)
+        if f1 > best_f1 + 1e-12 or tie:
+            best_t, best_f1 = float(round(t, 2)), f1
+    return best_t
+
+
 def scalar_metrics(metrics: dict) -> dict[str, float]:
     """Drop non-scalar entries (confusion matrices) for MLflow log_metrics."""
     return {k: float(v) for k, v in metrics.items() if isinstance(v, int | float)}

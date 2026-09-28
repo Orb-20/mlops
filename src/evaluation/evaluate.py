@@ -25,7 +25,9 @@ def default_test_sets() -> dict[str, pd.DataFrame]:
 
 def evaluate_predictor(predictor: Predictor, test_sets: dict[str, pd.DataFrame],
                        prefix: str = "") -> dict:
-    thr = get_config()["inference"]["toxicity_threshold"]
+    # each model is evaluated at its own decision threshold (calibrated on validation data,
+    # or the configured default for models without one)
+    thr = getattr(predictor, "threshold", get_config()["inference"]["toxicity_threshold"])
     out: dict = {}
     if "sentiment" in test_sets:
         df = test_sets["sentiment"]

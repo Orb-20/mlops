@@ -1,0 +1,78 @@
+name: Model validation
+
+# Demonstrates the candidate gate in CI:
+#   candidate model -> load -> evaluate -> regression suite -> promotion decision
+# CI runners have no GPU, so the candidate is a small CPU-trained model. By default the job
+# records the decision without failing (a tiny CPU model is expected to be rejected by the
+# minimum-metric gate); set enforce_gate=true to fail the workflow on REJECT.
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_train:
+        description: "rows per task for the CI candidate"
+        default: "1500"
+      epochs:
+        description: "training epochs"
+        default: "1"
+      enforce_gate:
+        description: "fail the workflow if the candidate is rejected"
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - "src/training/**"
+      - "src/evaluation/**"
+      - "src/nlp/**"
+      - "configs/gates.yaml"
+      - "configs/model.yaml"
+      - "data/regression/**"
+
+jobs:
+  validate-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      MLFLOW_DISABLE_AGENT_HINT: "1"
+      MLFLOW_TRACKING_URI: sqlite:///ci-mlflow.db
+      DATABASE_URL: sqlite:///ci.db
+      MAX_TRAIN: ${{ github.event.inputs.max_train || '1500' }}
+      EPOCHS: ${{ github.event.inputs.epochs || '1' }}
+      ENFORCE: ${{ github.event.inputs.enforce_gate || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install (CPU PyTorch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+      - name: Cache Hugging Face downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            data/raw
+          key: hf-${{ hashFiles('configs/config.yaml') }}
+      - name: Prepare versioned data
+        run: python -m src.data.prepare
+      - name: Train candidate (registers alias 'candidate')
+        run: python -m src.training.train --max-train "$MAX_TRAIN" --epochs "$EPOCHS"
+      - name: Load + evaluate + regression + promotion decision
+        run: |
+          set +e
+          python -m src.evaluation.promotion --alias candidate --dry-run > decision.json
+          code=$?
+          cat decision.json
+          echo "decision_exit=$code"
+          if [ "$ENFORCE" = "true" ] && [ $code -ne 0 ]; then exit $code; fi
+          # exit 3 = REJECT (recorded, not enforced); any other non-zero = pipeline error
+          if [ $code -ne 0 ] && [ $code -ne 3 ]; then exit $code; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: promotion-decision
+          path: decision.json

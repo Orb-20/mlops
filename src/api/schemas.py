@@ -101,6 +101,10 @@ class DriftEventOut(BaseModel):
     reason: str
     retraining_status: str
     created_at: datetime
+    language_distribution: dict[str, float] | None = None
+    sentiment_distribution: dict[str, float] | None = None
+    toxicity_distribution: dict[str, float] | None = None
+    thresholds: dict[str, float] | None = None
 
 
 class ModelEventOut(BaseModel):

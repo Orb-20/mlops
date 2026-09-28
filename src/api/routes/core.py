@@ -150,7 +150,15 @@ def _monitor_item(m) -> MonitorItem:
 
 # ------------------------------------------------------------------------------ drift / retraining
 def _drift_out(e) -> DriftEventOut:
-    return DriftEventOut.model_validate(e, from_attributes=True)
+    out = DriftEventOut.model_validate(e, from_attributes=True)
+    sig = (e.details or {}).get("signals", {})
+    cur_lang = sig.get("language", {}).get("details", {}).get("current", {})
+    cur_pred = sig.get("prediction", {}).get("details", {}).get("current", {})
+    out.language_distribution = cur_lang.get("language")
+    out.sentiment_distribution = cur_pred.get("sentiment")
+    out.toxicity_distribution = cur_pred.get("toxicity")
+    out.thresholds = (e.details or {}).get("thresholds") or None
+    return out
 
 
 @router.get("/api/v1/drift/latest", response_model=DriftEventOut | None, tags=["drift"])
@@ -191,3 +199,25 @@ def analyses(limit: int = Query(20, ge=1, le=200)):
                  "model_version": a.model_version, "comment_count": a.comment_count,
                  "created_at": a.created_at, "drift_event_id": a.drift_event_id}
                 for a in repo.recent_analyses(s, limit)]
+
+
+@router.get("/api/v1/analyses/{analysis_id}", tags=["analysis"])
+def analysis_detail(analysis_id: int):
+    """Stored summary + drift decision of one analysis (for re-opening in the dashboard)."""
+    from src.database.models import DriftEvent
+
+    with session_scope() as s:
+        a = repo.get_analysis(s, analysis_id)
+        if a is None:
+            raise HTTPException(404, f"analysis {analysis_id} not found")
+        ev = s.get(DriftEvent, a.drift_event_id) if a.drift_event_id else None
+        drift = (ev.details or {}) if ev else {}
+        for sig in drift.get("signals", {}).values():
+            sig.get("details", {}).pop("reference", None)
+        return {"analysis_id": a.id, "source": a.source, "content_id": a.content_id,
+                "data_mode": a.mode, "kind": a.kind, "model_version": a.model_version,
+                "comment_count": a.comment_count, "created_at": a.created_at,
+                "summary": a.summary, "drift": drift,
+                "drift_event_id": a.drift_event_id,
+                "retraining_status": ev.retraining_status if ev else None,
+                "report_url": f"/api/v1/report/{a.id}"}

@@ -18,7 +18,11 @@ training:
 
 inference:
   batch_size: 32
-  toxicity_threshold: 0.5
+  toxicity_threshold: 0.5       # default for models without a calibrated threshold
+  # Added 2026-09-29 after candidate v2 was rejected for a toxicity-recall drop at the fixed
+  # 0.5 threshold: each newly trained model stores an F1-optimal threshold chosen on the
+  # VALIDATION split (never test). v1 predates this and keeps 0.5.
+  calibrate_threshold: true
 
 baseline:
   tfidf_max_features: 50000

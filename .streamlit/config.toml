@@ -1,0 +1,13 @@
+[theme]
+# Pinned light: the sentiment red/gray/blue pair fails CVD separation on dark surfaces.
+base = "light"
+primaryColor = "#2a78d6"
+backgroundColor = "#fcfcfb"
+secondaryBackgroundColor = "#f3f2ef"
+textColor = "#0b0b0b"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

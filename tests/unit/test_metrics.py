@@ -22,3 +22,18 @@ def test_toxicity_single_class_has_no_auc():
 def test_scalar_metrics_drops_matrices():
     s = scalar_metrics(sentiment_metrics([0, 1], [0, 1]))
     assert "sentiment_confusion_matrix" not in s and "sentiment_macro_f1" in s
+
+
+def test_calibrate_threshold_finds_separating_point():
+    from src.training.metrics import calibrate_threshold
+
+    y = [0, 0, 0, 1, 1]
+    scores = [0.05, 0.1, 0.2, 0.3, 0.4]  # all positives below 0.5
+    t = calibrate_threshold(y, scores)
+    assert 0.2 < t <= 0.3
+
+
+def test_calibrate_threshold_prefers_half_on_ties():
+    from src.training.metrics import calibrate_threshold
+
+    assert calibrate_threshold([0, 1], [0.0, 1.0]) == 0.5

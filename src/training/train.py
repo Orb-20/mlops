@@ -26,10 +26,10 @@ from src.config.settings import get_config, project_path, set_seed
 from src.data.schemas import SENTIMENT_LABELS, TOXICITY_LABELS
 from src.data.validation import validate_labeled_frame
 from src.evaluation.evaluate import default_test_sets, evaluate_model_dir
-from src.nlp.inference import pick_device
+from src.nlp.inference import Predictor, pick_device
 from src.nlp.model import MultiTaskModel
 from src.training.dataset import load_split
-from src.training.metrics import scalar_metrics
+from src.training.metrics import calibrate_threshold, scalar_metrics
 from src.training.registry import log_and_register
 from src.training.tracking import lineage_tags, setup_mlflow
 from src.training.trainer import TrainConfig, train
@@ -77,6 +77,7 @@ def train_model(
     extra_dataset_version: str | None = None,
     reference_texts: list[str] | None = None,
     corrupt_labels: float = 0.0,
+    calibrate: bool | None = None,
 ) -> TrainResult:
     """Train one model end-to-end.
 
@@ -86,8 +87,11 @@ def train_model(
     reference_texts      saved with the model as its drift reference (reference_texts.json)
     corrupt_labels       FAULT INJECTION for the safety-gate demo: fraction of training labels
                          replaced with random wrong labels (simulates a broken annotation batch)
+    calibrate            pick the toxicity threshold on validation data (default: config)
     """
     cfg = get_config()
+    if calibrate is None:
+        calibrate = bool(cfg["inference"].get("calibrate_threshold", False))
     seed = set_seed()
     overrides = overrides or {}
     tcfg = build_train_config(overrides)
@@ -144,6 +148,17 @@ def train_model(
             (out_dir / "reference_texts.json").write_text(
                 json.dumps(reference_texts, ensure_ascii=False), encoding="utf-8")
         del model
+        if calibrate:
+            # per-model toxicity threshold, chosen on the VALIDATION split only
+            val_scores = Predictor(out_dir).run(val_data["toxicity"]["text"].tolist())
+            threshold = calibrate_threshold(val_data["toxicity"]["label"],
+                                            val_scores.toxicity_scores)
+            meta_path = out_dir / "metadata.json"
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta["toxicity_threshold"] = threshold
+            meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+            mlflow.log_param("toxicity_threshold", threshold)
+            log.info("Calibrated toxicity threshold on validation set: %.2f", threshold)
         # evaluate from the SAVED artifact, which also proves the artifact loads (gate 4)
         test = evaluate_model_dir(out_dir, default_test_sets())
         mlflow.log_metrics({f"test_{k}": v for k, v in scalar_metrics(test).items()})
